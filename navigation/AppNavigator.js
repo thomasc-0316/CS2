@@ -2,57 +2,167 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
+import { View, StyleSheet } from 'react-native';
 
-// We'll create these screens next
-import PostScreen from '../screens/PostScreen';
-import MessagesScreen from '../screens/MessagesScreen';
+// Screens
 import MapSelectionScreen from '../screens/MapSelectionScreen';
-import SideSelectionScreen from '../screens/SideSelectionScreen';
-import SiteSelectionScreen from '../screens/SiteSelectionScreen';
 import LineupGridScreen from '../screens/LineupGridScreen';
 import LineupDetailScreen from '../screens/LineupDetailScreen';
 import HotScreen from '../screens/HotScreen';
+import PostScreen from '../screens/PostScreen';
+import MessagesScreen from '../screens/MessagesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-// Home Stack - this handles all the lineup browsing
+// Home Stack
 function HomeStack() {
-    return (
-      <Stack.Navigator>
-        <Stack.Screen 
-          name="MapSelection" 
-          component={MapSelectionScreen}
-          options={{ title: 'CS Lineups' }}
-        />
-        <Stack.Screen 
-          name="LineupGrid" 
-          component={LineupGridScreen}
-        />
-        <Stack.Screen 
-          name="LineupDetail" 
-          component={LineupDetailScreen}
-          options={{ title: 'Lineup Detail' }}
-        />
-      </Stack.Navigator>
-    );
-  }
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: '#0a0a0a',
+        },
+        headerTintColor: '#fff',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      }}
+    >
+      <Stack.Screen 
+        name="MapSelection" 
+        component={MapSelectionScreen}
+        options={{ title: 'CS Lineups' }}
+      />
+      <Stack.Screen 
+        name="LineupGrid" 
+        component={LineupGridScreen}
+      />
+      <Stack.Screen 
+        name="LineupDetail" 
+        component={LineupDetailScreen}
+        options={{ title: 'Lineup Detail' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Hot Stack - NEW!
+function HotStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: '#0a0a0a',
+        },
+        headerTintColor: '#fff',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      }}
+    >
+      <Stack.Screen 
+        name="HotMain" 
+        component={HotScreen}
+        options={{ title: '🔥 Hot Lineups' }}
+      />
+      <Stack.Screen 
+        name="LineupDetail" 
+        component={LineupDetailScreen}
+        options={{ title: 'Lineup Detail' }}
+      />
+    </Stack.Navigator>
+  );
+}
 
 export default function AppNavigator() {
-    return (
-      <NavigationContainer>
-        <Tab.Navigator>
-            <Tab.Screen 
-                name="Home" 
-                component={HomeStack}
-                options={{ headerShown: false }}
-            />
-            <Tab.Screen name="Hot" component={HotScreen} />
-            <Tab.Screen name="Post" component={PostScreen} />
-            <Tab.Screen name="Messages" component={MessagesScreen} />
-            <Tab.Screen name="Profile" component={ProfileScreen} />
-            </Tab.Navigator>
-      </NavigationContainer>
-    );
-  }
+  return (
+    <NavigationContainer>
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName;
+
+            if (route.name === 'Home') {
+              iconName = focused ? 'home' : 'home-outline';
+            } else if (route.name === 'Hot') {
+              iconName = focused ? 'flame' : 'flame-outline';
+            } else if (route.name === 'Post') {
+              return (
+                <View style={styles.postButton}>
+                  <Ionicons name="add" size={28} color="#fff" />
+                </View>
+              );
+            } else if (route.name === 'Messages') {
+              iconName = focused ? 'chatbubble' : 'chatbubble-outline';
+            } else if (route.name === 'Profile') {
+              iconName = focused ? 'person-circle' : 'person-circle-outline';
+            }
+
+            return <Ionicons name={iconName} size={24} color={color} />;
+          },
+          tabBarActiveTintColor: '#fff',
+          tabBarInactiveTintColor: '#666',
+          tabBarStyle: {
+            backgroundColor: '#0a0a0a',
+            borderTopColor: '#1a1a1a',
+            height: 80,
+            paddingBottom: 20,
+            paddingTop: 10,
+          },
+          tabBarLabelStyle: {
+            fontSize: 11,
+            marginTop: 4,
+          },
+        })}
+      >
+        <Tab.Screen 
+          name="Home" 
+          component={HomeStack}
+          options={{ headerShown: false }}
+        />
+        <Tab.Screen 
+          name="Hot" 
+          component={HotStack}
+          options={{ headerShown: false }}
+        />
+        <Tab.Screen 
+          name="Post" 
+          component={PostScreen}
+          options={{ 
+            headerShown: false,
+            tabBarLabel: '',
+          }}
+        />
+        <Tab.Screen 
+          name="Messages" 
+          component={MessagesScreen}
+          options={{ headerShown: false }}
+        />
+        <Tab.Screen 
+          name="Profile" 
+          component={ProfileScreen}
+          options={{ headerShown: false }}
+        />
+      </Tab.Navigator>
+    </NavigationContainer>
+  );
+}
+
+const styles = StyleSheet.create({
+  postButton: {
+    width: 52,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#FF6800',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FF6800',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+});
