@@ -6,41 +6,54 @@ import {
   FlatList, 
   TouchableOpacity,
   Image,
-  Animated
+  Animated,
+  TextInput
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { LINEUPS } from '../data/lineups';
 
 export default function LineupGridScreen({ navigation, route }) {
   const { map } = route.params;
   const [filterVisible, setFilterVisible] = useState(false);
   const [slideAnim] = useState(new Animated.Value(300));
+  const [searchQuery, setSearchQuery] = useState('');
   
-  // Applied filter states (actually used for filtering)
-  const [selectedSide, setSelectedSide] = useState(null);
-  const [selectedSite, setSelectedSite] = useState(null);
-  const [selectedNadeType, setSelectedNadeType] = useState(null);
+  // Applied filter states (arrays for multi-select)
+  const [selectedSides, setSelectedSides] = useState([]);
+  const [selectedSites, setSelectedSites] = useState([]);
+  const [selectedNadeTypes, setSelectedNadeTypes] = useState([]);
 
   // Temporary filter states (for the panel before applying)
-  const [tempSide, setTempSide] = useState(null);
-  const [tempSite, setTempSite] = useState(null);
-  const [tempNadeType, setTempNadeType] = useState(null);
+  const [tempSides, setTempSides] = useState([]);
+  const [tempSites, setTempSites] = useState([]);
+  const [tempNadeTypes, setTempNadeTypes] = useState([]);
 
   // Get lineups for this map
   const mapLineups = LINEUPS.filter(lineup => lineup.mapId === map.id);
 
-  // Apply filters
+  // Apply filters and search
   const filteredLineups = mapLineups.filter(lineup => {
-    if (selectedSide && lineup.side !== selectedSide) return false;
-    if (selectedSite && lineup.site !== selectedSite) return false;
-    if (selectedNadeType && lineup.nadeType !== selectedNadeType) return false;
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch = 
+        lineup.title.toLowerCase().includes(query) ||
+        lineup.description.toLowerCase().includes(query);
+      if (!matchesSearch) return false;
+    }
+    
+    // Multi-select filters
+    if (selectedSides.length > 0 && !selectedSides.includes(lineup.side)) return false;
+    if (selectedSites.length > 0 && !selectedSites.includes(lineup.site)) return false;
+    if (selectedNadeTypes.length > 0 && !selectedNadeTypes.includes(lineup.nadeType)) return false;
     return true;
   }).sort((a, b) => b.uploadedAt - a.uploadedAt); // Sort by most recent
 
   const openFilter = () => {
     // Set temp filters to current applied filters
-    setTempSide(selectedSide);
-    setTempSite(selectedSite);
-    setTempNadeType(selectedNadeType);
+    setTempSides([...selectedSides]);
+    setTempSites([...selectedSites]);
+    setTempNadeTypes([...selectedNadeTypes]);
     
     setFilterVisible(true);
     Animated.timing(slideAnim, {
@@ -59,17 +72,59 @@ export default function LineupGridScreen({ navigation, route }) {
   };
 
   const applyFilters = () => {
-    setSelectedSide(tempSide);
-    setSelectedSite(tempSite);
-    setSelectedNadeType(tempNadeType);
+    setSelectedSides([...tempSides]);
+    setSelectedSites([...tempSites]);
+    setSelectedNadeTypes([...tempNadeTypes]);
     closeFilter();
   };
 
   const clearFilters = () => {
-    setTempSide(null);
-    setTempSite(null);
-    setTempNadeType(null);
+    setTempSides([]);
+    setTempSites([]);
+    setTempNadeTypes([]);
   };
+
+  const toggleTempSide = (side) => {
+    if (tempSides.includes(side)) {
+      setTempSides(tempSides.filter(s => s !== side));
+    } else {
+      setTempSides([...tempSides, side]);
+    }
+  };
+
+  const toggleTempSite = (site) => {
+    if (tempSites.includes(site)) {
+      setTempSites(tempSites.filter(s => s !== site));
+    } else {
+      setTempSites([...tempSites, site]);
+    }
+  };
+
+  const toggleTempNadeType = (type) => {
+    if (tempNadeTypes.includes(type)) {
+      setTempNadeTypes(tempNadeTypes.filter(t => t !== type));
+    } else {
+      setTempNadeTypes([...tempNadeTypes, type]);
+    }
+  };
+
+  const renderHeader = () => (
+    <View style={styles.searchContainer}>
+      <View style={styles.searchInputContainer}>
+        <Ionicons name="search" size={20} color="#aaa" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search"
+          placeholderTextColor="#aaa"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
+      <TouchableOpacity style={styles.filterButton} onPress={openFilter}>
+        <Ionicons name="funnel-outline" size={22} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
 
   const renderLineupCard = ({ item }) => (
     <TouchableOpacity
@@ -91,14 +146,23 @@ export default function LineupGridScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      {/* Header with Filter Button */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{map.name}</Text>
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchInputContainer}>
+          <Ionicons name="search" size={20} color="#aaa" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search"
+            placeholderTextColor="#aaa"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
         <TouchableOpacity style={styles.filterButton} onPress={openFilter}>
-          <Text style={styles.filterButtonText}>⚙️ Filter</Text>
+          <Ionicons name="funnel-outline" size={22} color="#fff" />
         </TouchableOpacity>
       </View>
-
+  
       {/* Lineup Grid */}
       <FlatList
         data={filteredLineups}
@@ -106,8 +170,9 @@ export default function LineupGridScreen({ navigation, route }) {
         keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         contentContainerStyle={styles.grid}
+        keyboardShouldPersistTaps="handled"
       />
-
+  
       {/* Filter Panel Overlay */}
       {filterVisible && (
         <>
@@ -131,56 +196,56 @@ export default function LineupGridScreen({ navigation, route }) {
             <Text style={styles.filterLabel}>Side</Text>
             <View style={styles.filterOptions}>
               <TouchableOpacity
-                style={[styles.filterOption, tempSide === 'T' && styles.filterOptionActive]}
-                onPress={() => setTempSide(tempSide === 'T' ? null : 'T')}
+                style={[styles.filterOption, tempSides.includes('T') && styles.filterOptionActive]}
+                onPress={() => toggleTempSide('T')}
               >
                 <Text style={styles.filterOptionText}>T</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.filterOption, tempSide === 'CT' && styles.filterOptionActive]}
-                onPress={() => setTempSide(tempSide === 'CT' ? null : 'CT')}
+                style={[styles.filterOption, tempSides.includes('CT') && styles.filterOptionActive]}
+                onPress={() => toggleTempSide('CT')}
               >
                 <Text style={styles.filterOptionText}>CT</Text>
               </TouchableOpacity>
             </View>
-
+  
             {/* Site Filter */}
             <Text style={styles.filterLabel}>Site</Text>
             <View style={styles.filterOptions}>
               <TouchableOpacity
-                style={[styles.filterOption, tempSite === 'A' && styles.filterOptionActive]}
-                onPress={() => setTempSite(tempSite === 'A' ? null : 'A')}
+                style={[styles.filterOption, tempSites.includes('A') && styles.filterOptionActive]}
+                onPress={() => toggleTempSite('A')}
               >
                 <Text style={styles.filterOptionText}>A</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.filterOption, tempSite === 'Mid' && styles.filterOptionActive]}
-                onPress={() => setTempSite(tempSite === 'Mid' ? null : 'Mid')}
+                style={[styles.filterOption, tempSites.includes('Mid') && styles.filterOptionActive]}
+                onPress={() => toggleTempSite('Mid')}
               >
                 <Text style={styles.filterOptionText}>Mid</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.filterOption, tempSite === 'B' && styles.filterOptionActive]}
-                onPress={() => setTempSite(tempSite === 'B' ? null : 'B')}
+                style={[styles.filterOption, tempSites.includes('B') && styles.filterOptionActive]}
+                onPress={() => toggleTempSite('B')}
               >
                 <Text style={styles.filterOptionText}>B</Text>
               </TouchableOpacity>
             </View>
-
+  
             {/* Nade Type Filter */}
             <Text style={styles.filterLabel}>Nade Type</Text>
             <View style={styles.filterOptions}>
               {['Smoke', 'Nade', 'Molotov', 'Flashbang', 'Decoy'].map(type => (
                 <TouchableOpacity
                   key={type}
-                  style={[styles.filterOption, tempNadeType === type && styles.filterOptionActive]}
-                  onPress={() => setTempNadeType(tempNadeType === type ? null : type)}
+                  style={[styles.filterOption, tempNadeTypes.includes(type) && styles.filterOptionActive]}
+                  onPress={() => toggleTempNadeType(type)}
                 >
                   <Text style={styles.filterOptionText}>{type}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-
+  
             {/* Action Buttons */}
             <View style={styles.actionButtons}>
               <TouchableOpacity
@@ -209,29 +274,43 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1a1a1a',
   },
-  header: {
+  searchContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
+    padding: 12,
     backgroundColor: '#2a2a2a',
+    marginBottom: 5,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  filterButton: {
-    backgroundColor: '#4a4a4a',
-    padding: 10,
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
     borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 45,
   },
-  filterButtonText: {
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
     color: '#fff',
     fontSize: 16,
+    height: '100%',
+  },
+  filterButton: {
+    padding: 8,
+    borderRadius: 8,
+    width: 45,
+    height: 45,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
   },
   grid: {
-    padding: 5,
+    paddingHorizontal: 5,
+    paddingBottom: 5,
   },
   lineupCard: {
     width: '47%',
@@ -289,6 +368,7 @@ const styles = StyleSheet.create({
     width: 300,
     backgroundColor: '#2a2a2a',
     padding: 20,
+    paddingBottom: 0,
     shadowColor: '#000',
     shadowOffset: { width: -2, height: 0 },
     shadowOpacity: 0.5,
@@ -326,26 +406,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   actionButtons: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 30,
+    padding: 20,
+    backgroundColor: '#2a2a2a',
+    borderTopWidth: 1,
+    borderTopColor: '#3a3a3a',
   },
   clearButton: {
     flex: 1,
-    backgroundColor: '#E74C3C',
+    backgroundColor: '#3a3a3a',
     padding: 15,
     borderRadius: 8,
     marginRight: 10,
     alignItems: 'center',
   },
   clearButtonText: {
-    color: '#fff',
+    color: '#aaa',
     fontSize: 16,
     fontWeight: 'bold',
   },
   applyButton: {
     flex: 1,
-    backgroundColor: '#27AE60',
+    backgroundColor: '#4a4a4a',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',

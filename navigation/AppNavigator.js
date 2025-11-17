@@ -39,6 +39,9 @@ function HomeStack() {
       <Stack.Screen 
         name="LineupGrid" 
         component={LineupGridScreen}
+        options={({ route }) => ({ 
+          title: route.params?.map?.name || 'Lineups'
+        })}
       />
       <Stack.Screen 
         name="LineupDetail" 

@@ -2,19 +2,36 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useUpvotes } from '../context/UpvoteContext';
+import { useFavorites } from '../context/FavoritesContext';
 
 export default function LineupDetailScreen({ route }) {
   const { lineup } = route.params;
   const { toggleUpvote, isUpvoted, getUpvoteCount } = useUpvotes();
+  const { toggleFavorite, isFavorite } = useFavorites();
 
   const upvoted = isUpvoted(lineup.id);
   const upvoteCount = getUpvoteCount(lineup);
+  const favorited = isFavorite(lineup.id);
 
   return (
     <ScrollView style={styles.container}>
       {/* Header Info */}
       <View style={styles.header}>
-        <Text style={styles.title}>{lineup.title}</Text>
+        {/* Title Row with Favorite Button */}
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{lineup.title}</Text>
+          <TouchableOpacity
+            onPress={() => toggleFavorite(lineup.id)}
+            style={styles.favoriteButton}
+          >
+            <Ionicons
+              name={favorited ? 'star' : 'star-outline'}
+              size={28}
+              color={favorited ? '#FFD700' : '#fff'}
+            />
+          </TouchableOpacity>
+        </View>
+
         <Text style={styles.description}>{lineup.description}</Text>
         
         <View style={styles.tags}>
@@ -75,11 +92,21 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#2a2a2a',
   },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   title: {
+    flex: 1,
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 10,
+    marginRight: 10,
+  },
+  favoriteButton: {
+    padding: 5,
   },
   description: {
     fontSize: 16,
