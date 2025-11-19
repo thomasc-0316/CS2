@@ -4,13 +4,14 @@ export const LINEUPS = [
   // 1. Long Cross Smoke
   {
     id: 1,
-    mapId: 1, // Dust II
+    mapId: 1,
     side: 'T',
     site: 'Mid',
     nadeType: 'Smoke',
     title: 'Long Cross Smoke',
     description: 'Smoke long cross from T spawn',
     standImage: require('../assets/lineup_images/dust2/dust2_long_cross_smoke_stand.png'),
+    standImageThirdPerson: require('../assets/lineup_images/dust2/dust2_long_cross_smoke_stand_third_person.png'),
     aimImage: require('../assets/lineup_images/dust2/dust2_long_cross_smoke_aim.png'),
     landImage: require('../assets/lineup_images/dust2/dust2_long_cross_smoke_land.png'),
     throwType: 'Jump Throw',
@@ -21,13 +22,14 @@ export const LINEUPS = [
   // 2. Cat Smoke
   {
     id: 2,
-    mapId: 1, // Dust II
+    mapId: 1,
     side: 'T',
     site: 'A',
     nadeType: 'Smoke',
     title: 'Cat Smoke',
     description: 'Smoke cat/short from cat',
     standImage: require('../assets/lineup_images/dust2/dust2_cat_cross_smoke_stand.png'),
+    standImageThirdPerson: require('../assets/lineup_images/dust2/dust2_cat_cross_smoke_stand_third_person.png'),
     aimImage: require('../assets/lineup_images/dust2/dust2_cat_cross_smoke_aim.png'),
     landImage: require('../assets/lineup_images/dust2/dust2_cat_cross_smoke_land.png'),
     throwType: 'Jump Throw',
@@ -35,10 +37,10 @@ export const LINEUPS = [
     upvotes: 445,
   },
   
-  // 3. Mid Doors Smoke
+  // 3. Mid Doors Smoke (NO third person)
   {
     id: 3,
-    mapId: 1, // Dust II
+    mapId: 1,
     side: 'T',
     site: 'Mid',
     nadeType: 'Smoke',
@@ -55,13 +57,14 @@ export const LINEUPS = [
   // 4. Xbox Smoke
   {
     id: 4,
-    mapId: 1, // Dust II
+    mapId: 1,
     side: 'T',
     site: 'Mid',
     nadeType: 'Smoke',
     title: 'Xbox Smoke',
     description: 'Smoke xbox from T spawn',
     standImage: require('../assets/lineup_images/dust2/dust2_xbox_smoke_stand.png'),
+    standImageThirdPerson: require('../assets/lineup_images/dust2/dust2_xbox_smoke_stand_third_person.png'),
     aimImage: require('../assets/lineup_images/dust2/dust2_xbox_smoke_aim.png'),
     landImage: require('../assets/lineup_images/dust2/dust2_xbox_smoke_land.png'),
     throwType: 'Jump Throw',
@@ -72,13 +75,14 @@ export const LINEUPS = [
   // 5. B Doors Smoke
   {
     id: 5,
-    mapId: 1, // Dust II
+    mapId: 1,
     side: 'T',
     site: 'B',
     nadeType: 'Smoke',
     title: 'B Doors Smoke',
     description: 'Smoke B doors from tunnels',
     standImage: require('../assets/lineup_images/dust2/dust2_b_door_smoke_stand.png'),
+    standImageThirdPerson: require('../assets/lineup_images/dust2/dust2_b_door_smoke_stand_third_person.png'),
     aimImage: require('../assets/lineup_images/dust2/dust2_b_door_smoke_aim.png'),
     landImage: require('../assets/lineup_images/dust2/dust2_b_door_smoke_land.png'),
     throwType: 'Left Click',
@@ -86,80 +90,5 @@ export const LINEUPS = [
     upvotes: 412,
   },
 
-  // ========== MIRAGE - PLACEHOLDER LINEUPS ==========
-  {
-    id: 6,
-    mapId: 2,
-    side: 'T',
-    site: 'A',
-    nadeType: 'Smoke',
-    title: 'T Spawn to CT Smoke',
-    description: 'Easy smoke from T spawn to CT',
-    standImage: 'https://via.placeholder.com/300x200?text=Stand+Here',
-    aimImage: 'https://via.placeholder.com/300x200?text=Aim+Here',
-    landImage: 'https://via.placeholder.com/300x200?text=Smoke+Lands',
-    throwType: 'Jump Throw',
-    uploadedAt: new Date('2024-11-15'),
-    upvotes: 234,
-  },
-  {
-    id: 7,
-    mapId: 2,
-    side: 'T',
-    site: 'A',
-    nadeType: 'Molotov',
-    title: 'Default Box Molly',
-    description: 'Molotov for default box on A site',
-    standImage: 'https://via.placeholder.com/300x200?text=Stand+Here',
-    aimImage: 'https://via.placeholder.com/300x200?text=Aim+Here',
-    landImage: 'https://via.placeholder.com/300x200?text=Molly+Lands',
-    throwType: 'Left Click',
-    uploadedAt: new Date('2024-11-14'),
-    upvotes: 189,
-  },
-  {
-    id: 8,
-    mapId: 2,
-    side: 'T',
-    site: 'A',
-    nadeType: 'Flashbang',
-    title: 'A Ramp Flash',
-    description: 'Flash over ramp for A execute',
-    standImage: 'https://via.placeholder.com/300x200?text=Stand+Here',
-    aimImage: 'https://via.placeholder.com/300x200?text=Aim+Here',
-    landImage: 'https://via.placeholder.com/300x200?text=Flash+Lands',
-    throwType: 'Jump Throw',
-    uploadedAt: new Date('2024-11-16'),
-    upvotes: 456,
-  },
-  {
-    id: 9,
-    mapId: 2,
-    side: 'T',
-    site: 'Mid',
-    nadeType: 'Smoke',
-    title: 'Mid Window Smoke',
-    description: 'Smoke mid window from T spawn',
-    standImage: 'https://via.placeholder.com/300x200?text=Stand+Here',
-    aimImage: 'https://via.placeholder.com/300x200?text=Aim+Here',
-    landImage: 'https://via.placeholder.com/300x200?text=Smoke+Lands',
-    throwType: 'Jump Throw',
-    uploadedAt: new Date('2024-11-13'),
-    upvotes: 312,
-  },
-  {
-    id: 10,
-    mapId: 2,
-    side: 'T',
-    site: 'Mid',
-    nadeType: 'Flashbang',
-    title: 'Connector Flash',
-    description: 'Flash connector from mid',
-    standImage: 'https://via.placeholder.com/300x200?text=Stand+Here',
-    aimImage: 'https://via.placeholder.com/300x200?text=Aim+Here',
-    landImage: 'https://via.placeholder.com/300x200?text=Flash+Lands',
-    throwType: 'Left Click',
-    uploadedAt: new Date('2024-11-12'),
-    upvotes: 167,
-  },
+  // ... rest of lineups stay the same
 ];

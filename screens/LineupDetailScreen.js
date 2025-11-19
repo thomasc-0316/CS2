@@ -1,6 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
+import { Asset } from 'expo-asset';
 import { Ionicons } from '@expo/vector-icons';
+import ImageView from 'react-native-image-viewing';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useFavorites } from '../context/FavoritesContext';
 
@@ -12,6 +15,35 @@ export default function LineupDetailScreen({ route }) {
   const upvoted = isUpvoted(lineup.id);
   const upvoteCount = getUpvoteCount(lineup);
   const favorited = isFavorite(lineup.id);
+
+  // Image viewing state
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showThirdPerson, setShowThirdPerson] = useState(false);
+
+  // Check if third person image exists
+  const hasThirdPerson = !!lineup.standImageThirdPerson;
+
+  // Prepare images for viewer - handle both local and remote images
+  const getImageUri = (imageSource) => {
+    if (typeof imageSource === 'string') {
+      return imageSource;
+    }
+    // Use Asset.fromModule for local assets
+    const asset = Asset.fromModule(imageSource);
+    return asset.uri;
+  };
+
+  const images = [
+    { uri: getImageUri(lineup.standImage) },
+    { uri: getImageUri(lineup.aimImage) },
+    { uri: getImageUri(lineup.landImage) },
+  ];
+
+  const openImageViewer = (index) => {
+    setCurrentImageIndex(index);
+    setImageViewerVisible(true);
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -65,29 +97,89 @@ export default function LineupDetailScreen({ route }) {
       {/* Image 1: Where to Stand */}
       <View style={styles.imageSection}>
         <Text style={styles.imageTitle}>1. Where to Stand</Text>
-        <Image
-          source={typeof lineup.standImage === 'string' ? { uri: lineup.standImage } : lineup.standImage}
-          style={styles.image}
-        />
+        <TouchableOpacity onPress={() => openImageViewer(0)} activeOpacity={0.9}>
+          <Image
+            source={typeof lineup.standImage === 'string' ? { uri: lineup.standImage } : lineup.standImage}
+            style={styles.image}
+          />
+          <View style={styles.zoomHint}>
+            <Ionicons name="expand-outline" size={18} color="#fff" />
+            <Text style={styles.zoomHintText}>Tap to zoom</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Show More Details Button (if third person exists) */}
+        {hasThirdPerson && (
+          <TouchableOpacity 
+            style={styles.showMoreButton}
+            onPress={() => setShowThirdPerson(!showThirdPerson)}
+          >
+            <Ionicons 
+              name={showThirdPerson ? 'chevron-up' : 'chevron-down'} 
+              size={20} 
+              color="#FF6800" 
+            />
+            <Text style={styles.showMoreText}>
+              {showThirdPerson ? 'Hide' : 'Show'} Third-Person View
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Third Person Image (expanded) */}
+        {hasThirdPerson && showThirdPerson && (
+          <View style={styles.thirdPersonContainer}>
+            <Text style={styles.thirdPersonLabel}>Third-Person Perspective:</Text>
+            <TouchableOpacity activeOpacity={0.9}>
+              <Image
+                source={typeof lineup.standImageThirdPerson === 'string' 
+                  ? { uri: lineup.standImageThirdPerson } 
+                  : lineup.standImageThirdPerson}
+                style={styles.image}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Image 2: Where to Aim */}
       <View style={styles.imageSection}>
         <Text style={styles.imageTitle}>2. Where to Aim</Text>
-        <Image
-          source={typeof lineup.aimImage === 'string' ? { uri: lineup.aimImage } : lineup.aimImage}
-          style={styles.image}
-        />
+        <TouchableOpacity onPress={() => openImageViewer(1)} activeOpacity={0.9}>
+          <Image
+            source={typeof lineup.aimImage === 'string' ? { uri: lineup.aimImage } : lineup.aimImage}
+            style={styles.image}
+          />
+          <View style={styles.zoomHint}>
+            <Ionicons name="expand-outline" size={18} color="#fff" />
+            <Text style={styles.zoomHintText}>Tap to zoom</Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
       {/* Image 3: Where it Lands */}
       <View style={styles.imageSection}>
         <Text style={styles.imageTitle}>3. Where it Lands</Text>
-        <Image
-          source={typeof lineup.landImage === 'string' ? { uri: lineup.landImage } : lineup.landImage}
-          style={styles.image}
-        />
+        <TouchableOpacity onPress={() => openImageViewer(2)} activeOpacity={0.9}>
+          <Image
+            source={typeof lineup.landImage === 'string' ? { uri: lineup.landImage } : lineup.landImage}
+            style={styles.image}
+          />
+          <View style={styles.zoomHint}>
+            <Ionicons name="expand-outline" size={18} color="#fff" />
+            <Text style={styles.zoomHintText}>Tap to zoom</Text>
+          </View>
+        </TouchableOpacity>
       </View>
+
+      {/* Image Viewer Modal */}
+      <ImageView
+        images={images}
+        imageIndex={currentImageIndex}
+        visible={imageViewerVisible}
+        onRequestClose={() => setImageViewerVisible(false)}
+        swipeToCloseEnabled={true}
+        doubleTapToZoomEnabled={true}
+      />
     </ScrollView>
   );
 }
@@ -190,5 +282,47 @@ const styles = StyleSheet.create({
     height: 250,
     borderRadius: 10,
     backgroundColor: '#3a3a3a',
+  },
+  zoomHint: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
+  },
+  zoomHintText: {
+    color: '#fff',
+    fontSize: 12,
+    marginLeft: 5,
+  },
+  showMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2a2a2a',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#FF6800',
+  },
+  showMoreText: {
+    color: '#FF6800',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 5,
+  },
+  thirdPersonContainer: {
+    marginTop: 15,
+  },
+  thirdPersonLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#aaa',
+    marginBottom: 10,
   },
 });
