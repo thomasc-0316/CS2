@@ -95,15 +95,20 @@ function ProfileStack() {
         },
       }}
     >
-      <Stack.Screen 
-        name="ProfileMain" 
+      <Stack.Screen
+        name="ProfileMain"
         component={ProfileScreen}
         options={{ title: 'Profile' }}
       />
-      <Stack.Screen 
-        name="SearchLineups" 
+      <Stack.Screen
+        name="SearchLineups"
         component={SearchLineupsScreen}
         options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="LineupDetail"
+        component={LineupDetailScreen}
+        options={{ title: 'Lineup Detail' }}
       />
     </Stack.Navigator>
   );

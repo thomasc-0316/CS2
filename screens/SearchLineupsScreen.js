@@ -50,14 +50,12 @@ export default function SearchLineupsScreen({ navigation }) {
   const renderLineupCard = ({ item }) => (
     <TouchableOpacity
       style={styles.lineupCard}
-      onPress={() => {
-        navigation.navigate('Home', {
-          screen: 'LineupDetail',
-          params: { lineup: item }
-        });
-      }}
+      onPress={() => navigation.navigate('LineupDetail', { lineup: item })}
     >
-      <Image source={{ uri: item.standImage }} style={styles.cardImage} />
+      <Image
+        source={typeof item.landImage === 'string' ? { uri: item.landImage } : item.landImage}
+        style={styles.cardImage}
+      />
       
       <View style={styles.cardInfo}>
         <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>

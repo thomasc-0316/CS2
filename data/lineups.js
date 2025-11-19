@@ -6,7 +6,7 @@ export const LINEUPS = [
     id: 1,
     mapId: 1,
     side: 'T',
-    site: 'Mid',
+    site: 'A',
     nadeType: 'Smoke',
     title: 'Long Cross Smoke',
     description: 'Smoke long cross from T spawn',

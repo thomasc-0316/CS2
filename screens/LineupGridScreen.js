@@ -23,7 +23,7 @@ function LineupCard({ item, navigation }) {
       onPress={() => navigation.navigate('LineupDetail', { lineup: item })}
     >
       <Image
-        source={typeof item.standImage === 'string' ? { uri: item.standImage } : item.standImage}
+        source={typeof item.landImage === 'string' ? { uri: item.landImage } : item.landImage}
         style={styles.cardImage}
         onLoadStart={() => setImageLoading(true)}
         onLoad={() => setImageLoading(false)}

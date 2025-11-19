@@ -16,7 +16,7 @@ import { MAPS } from '../data/maps';
 import { useUpvotes } from '../context/UpvoteContext';
 
 // Separate component for LineupCard to properly use hooks
-function LineupCard({ item, navigation }) {
+function LineupCard({ item, navigation, rank }) {
   const [imageLoading, setImageLoading] = useState(true);
 
   return (
@@ -25,7 +25,7 @@ function LineupCard({ item, navigation }) {
       onPress={() => navigation.navigate('LineupDetail', { lineup: item })}
     >
       <Image
-        source={typeof item.standImage === 'string' ? { uri: item.standImage } : item.standImage}
+        source={typeof item.landImage === 'string' ? { uri: item.landImage } : item.landImage}
         style={styles.cardImage}
         onLoadStart={() => setImageLoading(true)}
         onLoad={() => setImageLoading(false)}
@@ -37,6 +37,11 @@ function LineupCard({ item, navigation }) {
           <ActivityIndicator size="small" color="#666" />
         </View>
       )}
+
+      {/* Rank Badge */}
+      <View style={styles.rankBadge}>
+        <Text style={styles.rankText}>#{rank}</Text>
+      </View>
 
       {/* Textbook Badge */}
       {item.isTextbook && (
@@ -205,8 +210,8 @@ export default function HotScreen() {
     </View>
   );
 
-  const renderLineupCard = ({ item }) => (
-    <LineupCard item={item} navigation={navigation} />
+  const renderLineupCard = ({ item, index }) => (
+    <LineupCard item={item} navigation={navigation} rank={index + 1} />
   );
 
   return (
