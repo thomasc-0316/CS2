@@ -65,19 +65,28 @@ export default function LineupDetailScreen({ route }) {
       {/* Image 1: Where to Stand */}
       <View style={styles.imageSection}>
         <Text style={styles.imageTitle}>1. Where to Stand</Text>
-        <Image source={{ uri: lineup.standImage }} style={styles.image} />
+        <Image
+          source={typeof lineup.standImage === 'string' ? { uri: lineup.standImage } : lineup.standImage}
+          style={styles.image}
+        />
       </View>
 
       {/* Image 2: Where to Aim */}
       <View style={styles.imageSection}>
         <Text style={styles.imageTitle}>2. Where to Aim</Text>
-        <Image source={{ uri: lineup.aimImage }} style={styles.image} />
+        <Image
+          source={typeof lineup.aimImage === 'string' ? { uri: lineup.aimImage } : lineup.aimImage}
+          style={styles.image}
+        />
       </View>
 
       {/* Image 3: Where it Lands */}
       <View style={styles.imageSection}>
         <Text style={styles.imageTitle}>3. Where it Lands</Text>
-        <Image source={{ uri: lineup.landImage }} style={styles.image} />
+        <Image
+          source={typeof lineup.landImage === 'string' ? { uri: lineup.landImage } : lineup.landImage}
+          style={styles.image}
+        />
       </View>
     </ScrollView>
   );

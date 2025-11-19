@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,39 +11,121 @@ export default function ProfileScreen() {
   const navigation = useNavigation();
   const { getFavorites } = useFavorites();
   const { getUpvoteCount } = useUpvotes();
+  const [activeTab, setActiveTab] = useState('favorites'); // 'myLineups', 'favorites', 'upvotes'
+  const [bio, setBio] = useState(''); // Bio state
 
   const favoriteIds = getFavorites();
   const favoriteLineups = LINEUPS.filter(lineup => favoriteIds.includes(lineup.id));
+
+  // For now, "My Lineups" is empty (user hasn't posted any)
+  const myLineups = [];
+
+  // Get upvoted lineups (we don't track this yet, but let's prepare for it)
+  const upvotedLineups = [];
 
   const getMapName = (mapId) => {
     const map = MAPS.find(m => m.id === mapId);
     return map ? map.name : 'Unknown';
   };
 
+  const getActiveLineups = () => {
+    switch (activeTab) {
+      case 'myLineups':
+        return myLineups;
+      case 'favorites':
+        return favoriteLineups;
+      case 'upvotes':
+        return upvotedLineups;
+      default:
+        return [];
+    }
+  };
+
+  const activeLineups = getActiveLineups();
+
   const renderHeader = () => (
     <View>
       {/* Profile Info */}
       <View style={styles.profileHeader}>
         <View style={styles.avatarContainer}>
-          <Ionicons name="person-circle" size={80} color="#FF6800" />
+          <Ionicons name="person-circle" size={100} color="#FF6800" />
+          {/* Edit Avatar Button */}
+          <TouchableOpacity style={styles.editAvatarButton}>
+            <Ionicons name="pencil" size={16} color="#fff" />
+          </TouchableOpacity>
         </View>
         <Text style={styles.username}>Player</Text>
         
+        {/* Bio Section */}
+        <TouchableOpacity style={styles.bioContainer}>
+          <Text style={bio ? styles.bioText : styles.bioPlaceholder}>
+            {bio || 'Tap here to fill in your bio'}
+          </Text>
+        </TouchableOpacity>
+        
+        {/* Edit Profile and Settings Buttons */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={styles.editProfileButton}>
+            <Text style={styles.editProfileText}>Edit Profile</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.settingsButtonMain}>
+            <Ionicons name="settings-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
+        
         <View style={styles.statsContainer}>
           <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{favoriteLineups.length}</Text>
-            <Text style={styles.statLabel}>Favorites</Text>
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>Following</Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{favoriteIds.length}</Text>
-            <Text style={styles.statLabel}>Saved</Text>
+            <Text style={styles.statNumber}>0</Text>
+            <Text style={styles.statLabel}>Followers</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statNumber}>{favoriteLineups.length}</Text>
+            <Text style={styles.statLabel}>Saves</Text>
           </View>
         </View>
       </View>
 
-      {/* Favorites Section Title */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>⭐ Favorite Lineups</Text>
+      {/* Tab Bar */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'myLineups' && styles.tabActive]}
+          onPress={() => setActiveTab('myLineups')}
+        >
+          <Text style={[styles.tabText, activeTab === 'myLineups' && styles.tabTextActive]}>
+            My Lineups
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'favorites' && styles.tabActive]}
+          onPress={() => setActiveTab('favorites')}
+        >
+          <Text style={[styles.tabText, activeTab === 'favorites' && styles.tabTextActive]}>
+            Favorites
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'upvotes' && styles.tabActive]}
+          onPress={() => setActiveTab('upvotes')}
+        >
+          <Text style={[styles.tabText, activeTab === 'upvotes' && styles.tabTextActive]}>
+            Upvotes
+          </Text>
+        </TouchableOpacity>
+
+        {/* Search Button */}
+        <TouchableOpacity
+          style={styles.searchButton}
+          onPress={() => navigation.navigate('SearchLineups')}
+        >
+          <Ionicons name="search" size={20} color="#fff" />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -76,25 +158,37 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Ionicons name="star-outline" size={80} color="#4a4a4a" />
-      <Text style={styles.emptyText}>No favorites yet</Text>
-      <Text style={styles.emptySubtext}>
-        Tap the star on any lineup to save it here
-      </Text>
-    </View>
-  );
+  const renderEmptyState = () => {
+    let message = '';
+    if (activeTab === 'myLineups') {
+      message = 'No lineups posted yet';
+    } else if (activeTab === 'favorites') {
+      message = 'No favorites yet\nTap the star on any lineup to save it';
+    } else {
+      message = 'No upvoted lineups yet';
+    }
+
+    return (
+      <View style={styles.emptyState}>
+        <Ionicons 
+          name={activeTab === 'favorites' ? 'star-outline' : 'cloud-upload-outline'} 
+          size={80} 
+          color="#4a4a4a" 
+        />
+        <Text style={styles.emptyText}>{message}</Text>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
       <FlatList
-        data={favoriteLineups}
+        data={activeLineups}
         renderItem={renderLineupCard}
         keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         ListHeaderComponent={renderHeader}
-        ListEmptyComponent={favoriteLineups.length === 0 ? renderEmptyState : null}
+        ListEmptyComponent={renderEmptyState}
         contentContainerStyle={styles.grid}
       />
     </View>
@@ -118,38 +212,103 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
+    marginBottom: 10,
+  },
+  bioContainer: {
+    width: '100%',
+    paddingHorizontal: 30,
+    paddingVertical: 10,
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  bioText: {
+    fontSize: 14,
+    color: '#fff',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  bioPlaceholder: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 20,
+    gap: 10,
+  },
+  editProfileButton: {
+    backgroundColor: '#3a3a3a',
+    paddingHorizontal: 30,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  editProfileText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  settingsButtonMain: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#3a3a3a',
+    borderRadius: 22,
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '100%',
-    maxWidth: 300,
+    maxWidth: 350,
   },
   statBox: {
     alignItems: 'center',
     padding: 15,
   },
   statNumber: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FF6800',
-    marginBottom: 5,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#aaa',
-  },
-  sectionHeader: {
-    padding: 15,
-    backgroundColor: '#2a2a2a',
-    marginTop: 5,
-    marginBottom: 5,
-  },
-  sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
+    marginBottom: 5,
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#aaa',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#2a2a2a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#3a3a3a',
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: '#FF6800',
+  },
+  tabText: {
+    fontSize: 14,
+    color: '#aaa',
+    fontWeight: '600',
+  },
+  tabTextActive: {
+    color: '#fff',
+  },
+  searchButton: {
+    width: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   grid: {
     paddingHorizontal: 5,
@@ -213,15 +372,26 @@ const styles = StyleSheet.create({
     marginTop: 50,
   },
   emptyText: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 16,
     color: '#aaa',
     marginTop: 20,
-    marginBottom: 10,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#666',
     textAlign: 'center',
+  },
+  avatarContainer: {
+    marginBottom: 15,
+    position: 'relative',
+  },
+  editAvatarButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FF6800',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#2a2a2a',
   },
 });

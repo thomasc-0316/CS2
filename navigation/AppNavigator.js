@@ -13,6 +13,7 @@ import HotScreen from '../screens/HotScreen';
 import PostScreen from '../screens/PostScreen';
 import MessagesScreen from '../screens/MessagesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import SearchLineupsScreen from '../screens/SearchLineupsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -52,7 +53,7 @@ function HomeStack() {
   );
 }
 
-// Hot Stack - NEW!
+// Hot Stack
 function HotStack() {
   return (
     <Stack.Navigator
@@ -75,6 +76,34 @@ function HotStack() {
         name="LineupDetail" 
         component={LineupDetailScreen}
         options={{ title: 'Lineup Detail' }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Profile Stack
+function ProfileStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: '#0a0a0a',
+        },
+        headerTintColor: '#fff',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      }}
+    >
+      <Stack.Screen 
+        name="ProfileMain" 
+        component={ProfileScreen}
+        options={{ title: 'Profile' }}
+      />
+      <Stack.Screen 
+        name="SearchLineups" 
+        component={SearchLineupsScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
@@ -146,7 +175,7 @@ export default function AppNavigator() {
         />
         <Tab.Screen 
           name="Profile" 
-          component={ProfileScreen}
+          component={ProfileStack}
           options={{ headerShown: false }}
         />
       </Tab.Navigator>

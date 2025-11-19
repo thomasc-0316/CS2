@@ -131,7 +131,10 @@ export default function LineupGridScreen({ navigation, route }) {
       style={styles.lineupCard}
       onPress={() => navigation.navigate('LineupDetail', { lineup: item })}
     >
-      <Image source={{ uri: item.standImage }} style={styles.cardImage} />
+      <Image
+        source={typeof item.landImage === 'string' ? { uri: item.landImage } : item.landImage}
+        style={styles.cardImage}
+      />
       <View style={styles.cardInfo}>
         <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
         <Text style={styles.cardDescription} numberOfLines={2}>{item.description}</Text>
