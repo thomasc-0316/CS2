@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { Asset } from 'expo-asset';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +21,10 @@ export default function LineupDetailScreen({ route }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showThirdPerson, setShowThirdPerson] = useState(false);
 
+  const [standImageLoading, setStandImageLoading] = useState(true);
+  const [aimImageLoading, setAimImageLoading] = useState(true);
+  const [landImageLoading, setLandImageLoading] = useState(true);
+  const [thirdPersonLoading, setThirdPersonLoading] = useState(true);
   // Check if third person image exists
   const hasThirdPerson = !!lineup.standImageThirdPerson;
 
@@ -31,7 +35,7 @@ export default function LineupDetailScreen({ route }) {
     }
     // Use Asset.fromModule for local assets
     const asset = Asset.fromModule(imageSource);
-    return asset.uri;
+    return asset.localUri || asset.uri;
   };
 
   const images = [
@@ -51,7 +55,15 @@ export default function LineupDetailScreen({ route }) {
       <View style={styles.header}>
         {/* Title Row with Favorite Button */}
         <View style={styles.titleRow}>
-          <Text style={styles.title}>{lineup.title}</Text>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>{lineup.title}</Text>
+            {lineup.isTextbook && (
+              <View style={styles.textbookBadgeDetail}>
+                <Ionicons name="book" size={14} color="#fff" />
+                <Text style={styles.textbookLabel}>Textbook</Text>
+              </View>
+            )}
+          </View>
           <TouchableOpacity
             onPress={() => toggleFavorite(lineup.id)}
             style={styles.favoriteButton}
@@ -101,7 +113,14 @@ export default function LineupDetailScreen({ route }) {
           <Image
             source={typeof lineup.standImage === 'string' ? { uri: lineup.standImage } : lineup.standImage}
             style={styles.image}
+            onLoadStart={() => setStandImageLoading(true)}
+            onLoad={() => setStandImageLoading(false)}
           />
+          {standImageLoading && (
+            <View style={styles.detailImageLoading}>
+              <ActivityIndicator size="small" color="#666" />
+            </View>
+          )}
           <View style={styles.zoomHint}>
             <Ionicons name="expand-outline" size={18} color="#fff" />
             <Text style={styles.zoomHintText}>Tap to zoom</Text>
@@ -110,36 +129,43 @@ export default function LineupDetailScreen({ route }) {
 
         {/* Show More Details Button (if third person exists) */}
         {hasThirdPerson && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.showMoreButton}
             onPress={() => setShowThirdPerson(!showThirdPerson)}
           >
-            <Ionicons 
-              name={showThirdPerson ? 'chevron-up' : 'chevron-down'} 
-              size={20} 
-              color="#FF6800" 
+            <Ionicons
+              name={showThirdPerson ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color="#FF6800"
             />
             <Text style={styles.showMoreText}>
               {showThirdPerson ? 'Hide' : 'Show'} Third-Person View
             </Text>
           </TouchableOpacity>
         )}
-
-        {/* Third Person Image (expanded) */}
-        {hasThirdPerson && showThirdPerson && (
-          <View style={styles.thirdPersonContainer}>
-            <Text style={styles.thirdPersonLabel}>Third-Person Perspective:</Text>
-            <TouchableOpacity activeOpacity={0.9}>
-              <Image
-                source={typeof lineup.standImageThirdPerson === 'string' 
-                  ? { uri: lineup.standImageThirdPerson } 
-                  : lineup.standImageThirdPerson}
-                style={styles.image}
-              />
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
+
+      {/* Third Person Image (expanded) */}
+      {hasThirdPerson && showThirdPerson && (
+        <View style={styles.thirdPersonContainer}>
+          <Text style={styles.thirdPersonLabel}>Third-Person Perspective:</Text>
+          <TouchableOpacity activeOpacity={0.9}>
+            <Image
+              source={typeof lineup.standImageThirdPerson === 'string' 
+                ? { uri: lineup.standImageThirdPerson } 
+                : lineup.standImageThirdPerson}
+              style={styles.image}
+              onLoadStart={() => setThirdPersonLoading(true)}
+              onLoad={() => setThirdPersonLoading(false)}
+            />
+            {thirdPersonLoading && (
+              <View style={styles.detailImageLoading}>
+                <ActivityIndicator size="small" color="#666" />
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Image 2: Where to Aim */}
       <View style={styles.imageSection}>
@@ -148,7 +174,14 @@ export default function LineupDetailScreen({ route }) {
           <Image
             source={typeof lineup.aimImage === 'string' ? { uri: lineup.aimImage } : lineup.aimImage}
             style={styles.image}
+            onLoadStart={() => setAimImageLoading(true)}
+            onLoad={() => setAimImageLoading(false)}
           />
+          {aimImageLoading && (
+            <View style={styles.detailImageLoading}>
+              <ActivityIndicator size="small" color="#666" />
+            </View>
+          )}
           <View style={styles.zoomHint}>
             <Ionicons name="expand-outline" size={18} color="#fff" />
             <Text style={styles.zoomHintText}>Tap to zoom</Text>
@@ -163,7 +196,14 @@ export default function LineupDetailScreen({ route }) {
           <Image
             source={typeof lineup.landImage === 'string' ? { uri: lineup.landImage } : lineup.landImage}
             style={styles.image}
+            onLoadStart={() => setLandImageLoading(true)}
+            onLoad={() => setLandImageLoading(false)}
           />
+          {landImageLoading && (
+            <View style={styles.detailImageLoading}>
+              <ActivityIndicator size="small" color="#666" />
+            </View>
+          )}
           <View style={styles.zoomHint}>
             <Ionicons name="expand-outline" size={18} color="#fff" />
             <Text style={styles.zoomHintText}>Tap to zoom</Text>
@@ -324,5 +364,36 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#aaa',
     marginBottom: 10,
+  },
+  titleContainer: {
+    flex: 1,
+    marginRight: 10,
+  },
+  textbookBadgeDetail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#5E98D9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  textbookLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  detailImageLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 250,
+    backgroundColor: '#3a3a3a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 10,
   },
 });

@@ -1,11 +1,63 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFavorites } from '../context/FavoritesContext';
 import { useUpvotes } from '../context/UpvoteContext';
 import { LINEUPS } from '../data/lineups';
 import { MAPS } from '../data/maps';
+
+// Separate component for LineupCard to properly use hooks
+function LineupCard({ item, navigation, getMapName, getUpvoteCount }) {
+  const [imageLoading, setImageLoading] = useState(true);
+
+  return (
+    <TouchableOpacity
+      style={styles.lineupCard}
+      onPress={() => navigation.navigate('Home', {
+        screen: 'LineupDetail',
+        params: { lineup: item }
+      })}
+    >
+      <Image
+        source={typeof item.standImage === 'string' ? { uri: item.standImage } : item.standImage}
+        style={styles.cardImage}
+        onLoadStart={() => setImageLoading(true)}
+        onLoad={() => setImageLoading(false)}
+      />
+
+      {/* Loading Indicator */}
+      {imageLoading && (
+        <View style={styles.imageLoadingContainer}>
+          <ActivityIndicator size="small" color="#666" />
+        </View>
+      )}
+
+      {/* Textbook Badge */}
+      {item.isTextbook && (
+        <View style={styles.textbookBadge}>
+          <Ionicons name="book" size={16} color="#fff" />
+        </View>
+      )}
+
+      <View style={styles.cardInfo}>
+        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.mapName}>{getMapName(item.mapId)}</Text>
+
+        <View style={styles.tags}>
+          <Text style={styles.tag}>{item.side}</Text>
+          <Text style={styles.tag}>{item.site}</Text>
+          <Text style={styles.tag}>{item.nadeType}</Text>
+        </View>
+
+        <View style={styles.upvoteContainer}>
+          <Ionicons name="heart" size={16} color="#FF6800" />
+          <Text style={styles.upvoteText}>{getUpvoteCount(item)} upvotes</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
@@ -131,31 +183,12 @@ export default function ProfileScreen() {
   );
 
   const renderLineupCard = ({ item }) => (
-    <TouchableOpacity
-      style={styles.lineupCard}
-      onPress={() => navigation.navigate('Home', {
-        screen: 'LineupDetail',
-        params: { lineup: item }
-      })}
-    >
-      <Image source={{ uri: item.standImage }} style={styles.cardImage} />
-      
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.mapName}>{getMapName(item.mapId)}</Text>
-        
-        <View style={styles.tags}>
-          <Text style={styles.tag}>{item.side}</Text>
-          <Text style={styles.tag}>{item.site}</Text>
-          <Text style={styles.tag}>{item.nadeType}</Text>
-        </View>
-
-        <View style={styles.upvoteContainer}>
-          <Ionicons name="heart" size={16} color="#FF6800" />
-          <Text style={styles.upvoteText}>{getUpvoteCount(item)} upvotes</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+    <LineupCard
+      item={item}
+      navigation={navigation}
+      getMapName={getMapName}
+      getUpvoteCount={getUpvoteCount}
+    />
   );
 
   const renderEmptyState = () => {
@@ -320,6 +353,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     borderRadius: 10,
     overflow: 'hidden',
+    position: 'relative',
   },
   cardImage: {
     width: '100%',
@@ -393,5 +427,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 3,
     borderColor: '#2a2a2a',
+  },
+  textbookBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#5E98D9',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  imageLoadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+    backgroundColor: '#3a3a3a',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

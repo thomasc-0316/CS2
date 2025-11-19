@@ -1,16 +1,60 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
   TouchableOpacity,
   Image,
   Animated,
-  TextInput
+  TextInput,
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LINEUPS } from '../data/lineups';
+
+// Separate component for LineupCard to properly use hooks
+function LineupCard({ item, navigation }) {
+  const [imageLoading, setImageLoading] = useState(true);
+
+  return (
+    <TouchableOpacity
+      style={styles.lineupCard}
+      onPress={() => navigation.navigate('LineupDetail', { lineup: item })}
+    >
+      <Image
+        source={typeof item.standImage === 'string' ? { uri: item.standImage } : item.standImage}
+        style={styles.cardImage}
+        onLoadStart={() => setImageLoading(true)}
+        onLoad={() => setImageLoading(false)}
+      />
+
+      {/* Loading Indicator */}
+      {imageLoading && (
+        <View style={styles.imageLoadingContainer}>
+          <ActivityIndicator size="small" color="#666" />
+        </View>
+      )}
+
+      {/* Textbook Badge */}
+      {item.isTextbook && (
+        <View style={styles.textbookBadge}>
+          <Ionicons name="book" size={16} color="#fff" />
+        </View>
+      )}
+
+      <View style={styles.cardInfo}>
+        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.cardDescription} numberOfLines={2}>{item.description}</Text>
+        <View style={styles.tags}>
+          <Text style={styles.tag}>{item.side}</Text>
+          <Text style={styles.tag}>{item.site}</Text>
+          <Text style={styles.tag}>{item.nadeType}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function LineupGridScreen({ navigation, route }) {
   const { map } = route.params;
@@ -108,43 +152,8 @@ export default function LineupGridScreen({ navigation, route }) {
     }
   };
 
-  const renderHeader = () => (
-    <View style={styles.searchContainer}>
-      <View style={styles.searchInputContainer}>
-        <Ionicons name="search" size={20} color="#aaa" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search"
-          placeholderTextColor="#aaa"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-      <TouchableOpacity style={styles.filterButton} onPress={openFilter}>
-        <Ionicons name="funnel-outline" size={22} color="#fff" />
-      </TouchableOpacity>
-    </View>
-  );
-
   const renderLineupCard = ({ item }) => (
-    <TouchableOpacity
-      style={styles.lineupCard}
-      onPress={() => navigation.navigate('LineupDetail', { lineup: item })}
-    >
-      <Image
-        source={typeof item.landImage === 'string' ? { uri: item.landImage } : item.landImage}
-        style={styles.cardImage}
-      />
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.cardDescription} numberOfLines={2}>{item.description}</Text>
-        <View style={styles.tags}>
-          <Text style={styles.tag}>{item.side}</Text>
-          <Text style={styles.tag}>{item.site}</Text>
-          <Text style={styles.tag}>{item.nadeType}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+    <LineupCard item={item} navigation={navigation} />
   );
 
   return (
@@ -321,6 +330,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     borderRadius: 10,
     overflow: 'hidden',
+    position: 'relative',
   },
   cardImage: {
     width: '100%',
@@ -444,5 +454,31 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  textbookBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#5E98D9',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  imageLoadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120,
+    backgroundColor: '#3a3a3a',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

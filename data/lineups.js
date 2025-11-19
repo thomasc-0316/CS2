@@ -1,5 +1,5 @@
 export const LINEUPS = [
-  // ========== DUST II - REAL LINEUPS ==========
+  // ========== DUST II - TEXTBOOK LINEUPS ==========
   
   // 1. Long Cross Smoke
   {
@@ -17,6 +17,7 @@ export const LINEUPS = [
     throwType: 'Jump Throw',
     uploadedAt: new Date('2024-11-18'),
     upvotes: 523,
+    isTextbook: true, // Add this
   },
   
   // 2. Cat Smoke
@@ -35,9 +36,10 @@ export const LINEUPS = [
     throwType: 'Jump Throw',
     uploadedAt: new Date('2024-11-18'),
     upvotes: 445,
+    isTextbook: true, // Add this
   },
   
-  // 3. Mid Doors Smoke (NO third person)
+  // 3. Mid Doors Smoke
   {
     id: 3,
     mapId: 1,
@@ -52,6 +54,7 @@ export const LINEUPS = [
     throwType: 'Jump Throw',
     uploadedAt: new Date('2024-11-18'),
     upvotes: 489,
+    isTextbook: true, // Add this
   },
   
   // 4. Xbox Smoke
@@ -70,6 +73,7 @@ export const LINEUPS = [
     throwType: 'Jump Throw',
     uploadedAt: new Date('2024-11-18'),
     upvotes: 567,
+    isTextbook: true, // Add this
   },
   
   // 5. B Doors Smoke
@@ -88,7 +92,84 @@ export const LINEUPS = [
     throwType: 'Left Click',
     uploadedAt: new Date('2024-11-18'),
     upvotes: 412,
+    isTextbook: true, // Add this
   },
 
-  // ... rest of lineups stay the same
+  // ========== MIRAGE - PLACEHOLDER LINEUPS (NOT TEXTBOOK) ==========
+  {
+    id: 6,
+    mapId: 2,
+    side: 'T',
+    site: 'A',
+    nadeType: 'Smoke',
+    title: 'T Spawn to CT Smoke',
+    description: 'Easy smoke from T spawn to CT',
+    standImage: 'https://via.placeholder.com/300x200?text=Stand+Here',
+    aimImage: 'https://via.placeholder.com/300x200?text=Aim+Here',
+    landImage: 'https://via.placeholder.com/300x200?text=Smoke+Lands',
+    throwType: 'Jump Throw',
+    uploadedAt: new Date('2024-11-15'),
+    upvotes: 234,
+    // NO isTextbook - this is user-generated
+  },
+  {
+    id: 7,
+    mapId: 2,
+    side: 'T',
+    site: 'A',
+    nadeType: 'Molotov',
+    title: 'Default Box Molly',
+    description: 'Molotov for default box on A site',
+    standImage: 'https://via.placeholder.com/300x200?text=Stand+Here',
+    aimImage: 'https://via.placeholder.com/300x200?text=Aim+Here',
+    landImage: 'https://via.placeholder.com/300x200?text=Molly+Lands',
+    throwType: 'Left Click',
+    uploadedAt: new Date('2024-11-14'),
+    upvotes: 189,
+  },
+  {
+    id: 8,
+    mapId: 2,
+    side: 'T',
+    site: 'A',
+    nadeType: 'Flashbang',
+    title: 'A Ramp Flash',
+    description: 'Flash over ramp for A execute',
+    standImage: 'https://via.placeholder.com/300x200?text=Stand+Here',
+    aimImage: 'https://via.placeholder.com/300x200?text=Aim+Here',
+    landImage: 'https://via.placeholder.com/300x200?text=Flash+Lands',
+    throwType: 'Jump Throw',
+    uploadedAt: new Date('2024-11-16'),
+    upvotes: 456,
+  },
+  {
+    id: 9,
+    mapId: 2,
+    side: 'T',
+    site: 'Mid',
+    nadeType: 'Smoke',
+    title: 'Mid Window Smoke',
+    description: 'Smoke mid window from T spawn',
+    standImage: 'https://via.placeholder.com/300x200?text=Stand+Here',
+    aimImage: 'https://via.placeholder.com/300x200?text=Aim+Here',
+    landImage: 'https://via.placeholder.com/300x200?text=Smoke+Lands',
+    throwType: 'Jump Throw',
+    uploadedAt: new Date('2024-11-13'),
+    upvotes: 312,
+  },
+  {
+    id: 10,
+    mapId: 2,
+    side: 'T',
+    site: 'Mid',
+    nadeType: 'Flashbang',
+    title: 'Connector Flash',
+    description: 'Flash connector from mid',
+    standImage: 'https://via.placeholder.com/300x200?text=Stand+Here',
+    aimImage: 'https://via.placeholder.com/300x200?text=Aim+Here',
+    landImage: 'https://via.placeholder.com/300x200?text=Flash+Lands',
+    throwType: 'Left Click',
+    uploadedAt: new Date('2024-11-12'),
+    upvotes: 167,
+  },
 ];
