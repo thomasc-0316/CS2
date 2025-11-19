@@ -1,36 +1,86 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFavorites } from '../context/FavoritesContext';
 import { useUpvotes } from '../context/UpvoteContext';
+import { useDrafts } from '../context/DraftsContext';
 import { LINEUPS } from '../data/lineups';
 import { MAPS } from '../data/maps';
 
-// Separate component for LineupCard to properly use hooks
-function LineupCard({ item, navigation, getMapName, getUpvoteCount }) {
+// Draft card component
+function DraftCard({ item, navigation, onDelete }) {
   const [imageLoading, setImageLoading] = useState(true);
 
   return (
     <TouchableOpacity
       style={styles.lineupCard}
-      onPress={() => navigation.navigate('LineupDetail', { lineup: item })}
+      onPress={() => {
+        // TODO: Navigate to edit draft
+        console.log('Edit draft:', item.id);
+      }}
+      onLongPress={() => onDelete(item.id)}
     >
       <Image
-        source={typeof item.landImage === 'string' ? { uri: item.landImage } : item.landImage}
+        source={{ uri: item.standImage }}
         style={styles.cardImage}
         onLoadStart={() => setImageLoading(true)}
         onLoad={() => setImageLoading(false)}
       />
 
-      {/* Loading Indicator */}
       {imageLoading && (
         <View style={styles.imageLoadingContainer}>
           <ActivityIndicator size="small" color="#666" />
         </View>
       )}
 
-      {/* Textbook Badge */}
+      {/* Draft Badge */}
+      <View style={styles.draftBadge}>
+        <Ionicons name="bookmark" size={14} color="#fff" />
+        <Text style={styles.draftBadgeText}>Draft</Text>
+      </View>
+
+      <View style={styles.cardInfo}>
+        <Text style={styles.cardTitle} numberOfLines={1}>{item.title || 'Untitled'}</Text>
+        <View style={styles.tags}>
+          {item.side && <Text style={styles.tag}>{item.side}</Text>}
+          {item.site && <Text style={styles.tag}>{item.site}</Text>}
+          {item.nadeType && <Text style={styles.tag}>{item.nadeType}</Text>}
+        </View>
+        <Text style={styles.draftDate}>
+          {new Date(item.createdAt).toLocaleDateString()}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// Lineup card component
+function LineupCard({ item, navigation, getMapName, getUpvoteCount }) {
+  const [imageLoading, setImageLoading] = useState(true);
+
+  return (
+    <TouchableOpacity
+      style={styles.lineupCard}
+      onPress={() => navigation.navigate('Home', {
+        screen: 'LineupDetail',
+        params: { lineup: item }
+      })}
+    >
+      <Image
+        source={typeof item.standImage === 'string' ? { uri: item.standImage } : item.standImage}
+        style={styles.cardImage}
+        onLoadStart={() => setImageLoading(true)}
+        onLoad={() => setImageLoading(false)}
+      />
+
+      {imageLoading && (
+        <View style={styles.imageLoadingContainer}>
+          <ActivityIndicator size="small" color="#666" />
+        </View>
+      )}
+
       {item.isTextbook && (
         <View style={styles.textbookBadge}>
           <Ionicons name="book" size={16} color="#fff" />
@@ -60,16 +110,13 @@ export default function ProfileScreen() {
   const navigation = useNavigation();
   const { getFavorites } = useFavorites();
   const { getUpvoteCount } = useUpvotes();
-  const [activeTab, setActiveTab] = useState('favorites'); // 'myLineups', 'favorites', 'upvotes'
-  const [bio, setBio] = useState(''); // Bio state
+  const { drafts, deleteDraft } = useDrafts();
+  const [activeTab, setActiveTab] = useState('favorites');
+  const [bio, setBio] = useState('');
 
   const favoriteIds = getFavorites();
   const favoriteLineups = LINEUPS.filter(lineup => favoriteIds.includes(lineup.id));
-
-  // For now, "My Lineups" is empty (user hasn't posted any)
   const myLineups = [];
-
-  // Get upvoted lineups (we don't track this yet, but let's prepare for it)
   const upvotedLineups = [];
 
   const getMapName = (mapId) => {
@@ -77,7 +124,22 @@ export default function ProfileScreen() {
     return map ? map.name : 'Unknown';
   };
 
-  const getActiveLineups = () => {
+  const handleDeleteDraft = (draftId) => {
+    Alert.alert(
+      'Delete Draft',
+      'Are you sure you want to delete this draft?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteDraft(draftId),
+        },
+      ]
+    );
+  };
+
+  const getActiveContent = () => {
     switch (activeTab) {
       case 'myLineups':
         return myLineups;
@@ -85,34 +147,32 @@ export default function ProfileScreen() {
         return favoriteLineups;
       case 'upvotes':
         return upvotedLineups;
+      case 'drafts':
+        return drafts;
       default:
         return [];
     }
   };
 
-  const activeLineups = getActiveLineups();
+  const activeContent = getActiveContent();
 
   const renderHeader = () => (
     <View>
-      {/* Profile Info */}
       <View style={styles.profileHeader}>
         <View style={styles.avatarContainer}>
           <Ionicons name="person-circle" size={100} color="#FF6800" />
-          {/* Edit Avatar Button */}
           <TouchableOpacity style={styles.editAvatarButton}>
             <Ionicons name="pencil" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
         <Text style={styles.username}>Player</Text>
         
-        {/* Bio Section */}
         <TouchableOpacity style={styles.bioContainer}>
           <Text style={bio ? styles.bioText : styles.bioPlaceholder}>
             {bio || 'Tap here to fill in your bio'}
           </Text>
         </TouchableOpacity>
         
-        {/* Edit Profile and Settings Buttons */}
         <View style={styles.actionButtons}>
           <TouchableOpacity style={styles.editProfileButton}>
             <Text style={styles.editProfileText}>Edit Profile</Text>
@@ -151,6 +211,15 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
+          style={[styles.tab, activeTab === 'drafts' && styles.tabActive]}
+          onPress={() => setActiveTab('drafts')}
+        >
+          <Text style={[styles.tabText, activeTab === 'drafts' && styles.tabTextActive]}>
+            Drafts
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={[styles.tab, activeTab === 'favorites' && styles.tabActive]}
           onPress={() => setActiveTab('favorites')}
         >
@@ -159,16 +228,6 @@ export default function ProfileScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'upvotes' && styles.tabActive]}
-          onPress={() => setActiveTab('upvotes')}
-        >
-          <Text style={[styles.tabText, activeTab === 'upvotes' && styles.tabTextActive]}>
-            Upvotes
-          </Text>
-        </TouchableOpacity>
-
-        {/* Search Button */}
         <TouchableOpacity
           style={styles.searchButton}
           onPress={() => navigation.navigate('SearchLineups')}
@@ -179,32 +238,41 @@ export default function ProfileScreen() {
     </View>
   );
 
-  const renderLineupCard = ({ item }) => (
-    <LineupCard
-      item={item}
-      navigation={navigation}
-      getMapName={getMapName}
-      getUpvoteCount={getUpvoteCount}
-    />
-  );
+  const renderItem = ({ item }) => {
+    if (activeTab === 'drafts') {
+      return <DraftCard item={item} navigation={navigation} onDelete={handleDeleteDraft} />;
+    }
+    return (
+      <LineupCard
+        item={item}
+        navigation={navigation}
+        getMapName={getMapName}
+        getUpvoteCount={getUpvoteCount}
+      />
+    );
+  };
 
   const renderEmptyState = () => {
     let message = '';
+    let iconName = '';
+    
     if (activeTab === 'myLineups') {
       message = 'No lineups posted yet';
+      iconName = 'cloud-upload-outline';
+    } else if (activeTab === 'drafts') {
+      message = 'No drafts saved yet\nSave a draft from the Post screen';
+      iconName = 'bookmark-outline';
     } else if (activeTab === 'favorites') {
       message = 'No favorites yet\nTap the star on any lineup to save it';
+      iconName = 'star-outline';
     } else {
       message = 'No upvoted lineups yet';
+      iconName = 'heart-outline';
     }
 
     return (
       <View style={styles.emptyState}>
-        <Ionicons 
-          name={activeTab === 'favorites' ? 'star-outline' : 'cloud-upload-outline'} 
-          size={80} 
-          color="#4a4a4a" 
-        />
+        <Ionicons name={iconName} size={80} color="#4a4a4a" />
         <Text style={styles.emptyText}>{message}</Text>
       </View>
     );
@@ -213,8 +281,8 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={activeLineups}
-        renderItem={renderLineupCard}
+        data={activeContent}
+        renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         ListHeaderComponent={renderHeader}
@@ -237,6 +305,17 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginBottom: 15,
+  },
+  editAvatarButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#FF6800',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   username: {
     fontSize: 24,
@@ -328,7 +407,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#FF6800',
   },
   tabText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#aaa',
     fontWeight: '600',
   },
@@ -357,6 +436,44 @@ const styles = StyleSheet.create({
     height: 120,
     backgroundColor: '#3a3a3a',
   },
+  imageLoadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#3a3a3a',
+  },
+  textbookBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#FF6800',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  draftBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#666',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  draftBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
   cardInfo: {
     padding: 10,
   },
@@ -368,87 +485,50 @@ const styles = StyleSheet.create({
   },
   mapName: {
     fontSize: 12,
-    color: '#FF6800',
-    marginBottom: 8,
+    color: '#999',
+    marginBottom: 6,
   },
   tags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 8,
+    gap: 4,
+    marginBottom: 6,
   },
   tag: {
+    backgroundColor: '#FF6800',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
     fontSize: 10,
     color: '#fff',
-    backgroundColor: '#4a4a4a',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginRight: 4,
-    marginBottom: 4,
+    fontWeight: '600',
   },
   upvoteContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
   },
   upvoteText: {
     fontSize: 12,
-    color: '#fff',
-    marginLeft: 5,
-    fontWeight: 'bold',
+    color: '#999',
+  },
+  draftDate: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 4,
   },
   emptyState: {
-    alignItems: 'center',
+    flex: 1,
     justifyContent: 'center',
-    padding: 50,
-    marginTop: 50,
+    alignItems: 'center',
+    paddingTop: 80,
+    paddingHorizontal: 40,
   },
   emptyText: {
     fontSize: 16,
-    color: '#aaa',
-    marginTop: 20,
+    color: '#666',
     textAlign: 'center',
-  },
-  avatarContainer: {
-    marginBottom: 15,
-    position: 'relative',
-  },
-  editAvatarButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FF6800',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#2a2a2a',
-  },
-  textbookBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#5E98D9',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
-  },
-  imageLoadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 120,
-    backgroundColor: '#3a3a3a',
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginTop: 20,
+    lineHeight: 24,
   },
 });

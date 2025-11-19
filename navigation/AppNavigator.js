@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 
 // Screens
 import MapSelectionScreen from '../screens/MapSelectionScreen';
@@ -11,7 +11,8 @@ import LineupGridScreen from '../screens/LineupGridScreen';
 import LineupDetailScreen from '../screens/LineupDetailScreen';
 import HotScreen from '../screens/HotScreen';
 import PostScreen from '../screens/PostScreen';
-import MessagesScreen from '../screens/MessagesScreen';
+import PreviewPostScreen from '../screens/PreviewPostScreen';
+import TacticsScreen from '../screens/TacticsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SearchLineupsScreen from '../screens/SearchLineupsScreen';
 
@@ -81,6 +82,44 @@ function HotStack() {
   );
 }
 
+// Post Stack (to include Preview)
+function PostStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: '#0a0a0a',
+        },
+        headerTintColor: '#fff',
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      }}
+    >
+      <Stack.Screen 
+        name="PostMain" 
+        component={PostScreen}
+        options={({ navigation }) => ({
+          title: 'Create Lineup',
+          headerLeft: () => (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Home')}
+              style={{ marginLeft: 10 }}
+            >
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+          ),
+        })}
+      />
+      <Stack.Screen 
+        name="PreviewPost" 
+        component={PreviewPostScreen}
+        options={{ headerShown: false }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 // Profile Stack
 function ProfileStack() {
   return (
@@ -95,20 +134,15 @@ function ProfileStack() {
         },
       }}
     >
-      <Stack.Screen
-        name="ProfileMain"
+      <Stack.Screen 
+        name="ProfileMain" 
         component={ProfileScreen}
         options={{ title: 'Profile' }}
       />
-      <Stack.Screen
-        name="SearchLineups"
+      <Stack.Screen 
+        name="SearchLineups" 
         component={SearchLineupsScreen}
         options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="LineupDetail"
-        component={LineupDetailScreen}
-        options={{ title: 'Lineup Detail' }}
       />
     </Stack.Navigator>
   );
@@ -132,8 +166,8 @@ export default function AppNavigator() {
                   <Ionicons name="add" size={28} color="#fff" />
                 </View>
               );
-            } else if (route.name === 'Messages') {
-              iconName = focused ? 'chatbubble' : 'chatbubble-outline';
+            } else if (route.name === 'Tactics') {
+              iconName = focused ? 'book' : 'book-outline';
             } else if (route.name === 'Profile') {
               iconName = focused ? 'person-circle' : 'person-circle-outline';
             }
@@ -167,15 +201,15 @@ export default function AppNavigator() {
         />
         <Tab.Screen 
           name="Post" 
-          component={PostScreen}
+          component={PostStack}
           options={{ 
             headerShown: false,
             tabBarLabel: '',
           }}
         />
         <Tab.Screen 
-          name="Messages" 
-          component={MessagesScreen}
+          name="Tactics" 
+          component={TacticsScreen}
           options={{ headerShown: false }}
         />
         <Tab.Screen 
