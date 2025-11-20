@@ -6,20 +6,25 @@ import { Ionicons } from '@expo/vector-icons';
 import ImageView from 'react-native-image-viewing';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useFavorites } from '../context/FavoritesContext';
+import { useComments } from '../context/CommentsContext';
+import CommentsModal from '../components/CommentsModal';
 
 export default function LineupDetailScreen({ route }) {
   const { lineup } = route.params;
   const { toggleUpvote, isUpvoted, getUpvoteCount } = useUpvotes();
   const { toggleFavorite, isFavorite } = useFavorites();
+  const { getCommentCount } = useComments();
 
   const upvoted = isUpvoted(lineup.id);
   const upvoteCount = getUpvoteCount(lineup);
   const favorited = isFavorite(lineup.id);
+  const commentCount = getCommentCount(lineup.id);
 
   // Image viewing state
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showThirdPerson, setShowThirdPerson] = useState(false);
+  const [commentsVisible, setCommentsVisible] = useState(false);
 
   const [standImageLoading, setStandImageLoading] = useState(true);
   const [aimImageLoading, setAimImageLoading] = useState(true);
@@ -84,20 +89,36 @@ export default function LineupDetailScreen({ route }) {
           <Text style={styles.tag}>{lineup.nadeType}</Text>
         </View>
 
-        {/* Upvote Button */}
-        <TouchableOpacity
-          style={[styles.upvoteButton, upvoted && styles.upvoteButtonActive]}
-          onPress={() => toggleUpvote(lineup.id)}
-        >
-          <Ionicons 
-            name={upvoted ? 'heart' : 'heart-outline'} 
-            size={24} 
-            color={upvoted ? '#fff' : '#FF6800'} 
-          />
-          <Text style={[styles.upvoteText, upvoted && styles.upvoteTextActive]}>
-            {upvoteCount} upvotes
-          </Text>
-        </TouchableOpacity>
+        {/* Upvote and Comment Buttons */}
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity
+            style={[styles.upvoteButton, upvoted && styles.upvoteButtonActive]}
+            onPress={() => toggleUpvote(lineup.id)}
+          >
+            <Ionicons
+              name={upvoted ? 'heart' : 'heart-outline'}
+              size={24}
+              color={upvoted ? '#fff' : '#FF6800'}
+            />
+            <Text style={[styles.upvoteText, upvoted && styles.upvoteTextActive]}>
+              {upvoteCount}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.commentButton}
+            onPress={() => setCommentsVisible(true)}
+          >
+            <Ionicons
+              name="chatbubble-outline"
+              size={24}
+              color="#fff"
+            />
+            <Text style={styles.commentText}>
+              {commentCount}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Throw Instructions */}
@@ -220,6 +241,13 @@ export default function LineupDetailScreen({ route }) {
         swipeToCloseEnabled={true}
         doubleTapToZoomEnabled={true}
       />
+
+      {/* Comments Modal */}
+      <CommentsModal
+        visible={commentsVisible}
+        onClose={() => setCommentsVisible(false)}
+        lineupId={lineup.id}
+      />
     </ScrollView>
   );
 }
@@ -269,7 +297,12 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   upvoteButton: {
+    flex: 3,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -291,6 +324,23 @@ const styles = StyleSheet.create({
   },
   upvoteTextActive: {
     color: '#fff',
+  },
+  commentButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3a3a3a',
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#4a4a4a',
+  },
+  commentText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginLeft: 10,
   },
   instructionBox: {
     backgroundColor: '#5E98D9',

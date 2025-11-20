@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFavorites } from '../context/FavoritesContext';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useDrafts } from '../context/DraftsContext';
+import { useProfile } from '../context/ProfileContext';
+import { useFollow } from '../context/FollowContext';
 import { LINEUPS } from '../data/lineups';
 import { MAPS } from '../data/maps';
+import FollowersFollowingModal from '../components/FollowersFollowingModal';
 
 // Draft card component
 function DraftCard({ item, navigation, onDelete }) {
@@ -63,13 +66,10 @@ function LineupCard({ item, navigation, getMapName, getUpvoteCount }) {
   return (
     <TouchableOpacity
       style={styles.lineupCard}
-      onPress={() => navigation.navigate('Home', {
-        screen: 'LineupDetail',
-        params: { lineup: item }
-      })}
+      onPress={() => navigation.navigate('LineupDetail', { lineup: item })}
     >
       <Image
-        source={typeof item.standImage === 'string' ? { uri: item.standImage } : item.standImage}
+        source={typeof item.landImage === 'string' ? { uri: item.landImage } : item.landImage}
         style={styles.cardImage}
         onLoadStart={() => setImageLoading(true)}
         onLoad={() => setImageLoading(false)}
@@ -111,13 +111,21 @@ export default function ProfileScreen() {
   const { getFavorites } = useFavorites();
   const { getUpvoteCount } = useUpvotes();
   const { drafts, deleteDraft } = useDrafts();
+  const { profile, updateProfile } = useProfile();
+  const { getFollowingCount, getFollowersCount } = useFollow();
   const [activeTab, setActiveTab] = useState('favorites');
-  const [bio, setBio] = useState('');
+  const [followModalVisible, setFollowModalVisible] = useState(false);
+  const [followModalTab, setFollowModalTab] = useState('followers');
 
   const favoriteIds = getFavorites();
   const favoriteLineups = LINEUPS.filter(lineup => favoriteIds.includes(lineup.id));
   const myLineups = [];
   const upvotedLineups = [];
+
+  // Calculate total upvotes received on user's posts
+  const totalUpvotesReceived = myLineups.reduce((total, lineup) => {
+    return total + getUpvoteCount(lineup);
+  }, 0);
 
   const getMapName = (mapId) => {
     const map = MAPS.find(m => m.id === mapId);
@@ -156,45 +164,99 @@ export default function ProfileScreen() {
 
   const activeContent = getActiveContent();
 
+  const handleEditBio = () => {
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        'Edit Bio',
+        'Enter your bio',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Save',
+            onPress: (text) => {
+              updateProfile({ bio: text || '' });
+            },
+          },
+        ],
+        'plain-text',
+        profile.bio
+      );
+    } else {
+      // For Android, navigate to edit profile
+      navigation.navigate('EditProfile');
+    }
+  };
+
+  const openFollowersModal = () => {
+    setFollowModalTab('followers');
+    setFollowModalVisible(true);
+  };
+
+  const openFollowingModal = () => {
+    setFollowModalTab('following');
+    setFollowModalVisible(true);
+  };
+
   const renderHeader = () => (
     <View>
       <View style={styles.profileHeader}>
-        <View style={styles.avatarContainer}>
-          <Ionicons name="person-circle" size={100} color="#FF6800" />
-          <TouchableOpacity style={styles.editAvatarButton}>
-            <Ionicons name="pencil" size={16} color="#fff" />
-          </TouchableOpacity>
+        {/* Top Row: Profile Picture + Username/ID */}
+        <View style={styles.topRow}>
+          {/* Profile Picture */}
+          <View style={styles.avatarContainer}>
+            {profile.profilePicture ? (
+              <Image source={{ uri: profile.profilePicture }} style={styles.profilePicture} />
+            ) : (
+              <Ionicons name="person-circle" size={70} color="#FF6800" />
+            )}
+          </View>
+
+          {/* Username and Player ID */}
+          <View style={styles.userInfoContainer}>
+            <Text style={styles.username}>{profile.username}</Text>
+            <Text style={styles.playerID}>Player ID: {profile.playerID}</Text>
+          </View>
         </View>
-        <Text style={styles.username}>Player</Text>
-        
-        <TouchableOpacity style={styles.bioContainer}>
-          <Text style={bio ? styles.bioText : styles.bioPlaceholder}>
-            {bio || 'Tap here to fill in your bio'}
+
+        {/* Bio - Tappable */}
+        <TouchableOpacity style={styles.bioContainer} onPress={handleEditBio}>
+          <Text style={profile.bio ? styles.bioText : styles.bioPlaceholder}>
+            {profile.bio || 'Tap to add bio'}
           </Text>
         </TouchableOpacity>
-        
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.editProfileButton}>
-            <Text style={styles.editProfileText}>Edit Profile</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.settingsButtonMain}>
-            <Ionicons name="settings-outline" size={22} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Following</Text>
+
+        {/* Stats and Buttons Row */}
+        <View style={styles.statsAndButtonsRow}>
+          {/* Stats (left side, compact) */}
+          <View style={styles.statsContainer}>
+            <TouchableOpacity style={styles.statItem} onPress={openFollowingModal}>
+              <Text style={styles.statNumber}>{getFollowingCount()}</Text>
+              <Text style={styles.statLabel}>Following</Text>
+            </TouchableOpacity>
+            <View style={styles.statDivider} />
+            <TouchableOpacity style={styles.statItem} onPress={openFollowersModal}>
+              <Text style={styles.statNumber}>{getFollowersCount()}</Text>
+              <Text style={styles.statLabel}>Followers</Text>
+            </TouchableOpacity>
+            <View style={styles.statDivider} />
+            <TouchableOpacity style={styles.statItem}>
+              <Text style={styles.statNumber}>{totalUpvotesReceived}</Text>
+              <Text style={styles.statLabel}>Upvotes</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>0</Text>
-            <Text style={styles.statLabel}>Followers</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{favoriteLineups.length}</Text>
-            <Text style={styles.statLabel}>Saves</Text>
+
+          {/* Action Buttons (right side) */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity 
+              style={styles.editProfileButton}
+              onPress={() => navigation.navigate('EditProfile')}
+            >
+              <Text style={styles.editProfileText}>Edit Profile</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.settingsButtonMain}>
+              <Ionicons name="settings-outline" size={20} color="#fff" />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -289,6 +351,13 @@ export default function ProfileScreen() {
         ListEmptyComponent={renderEmptyState}
         contentContainerStyle={styles.grid}
       />
+
+      {/* Followers/Following Modal */}
+      <FollowersFollowingModal
+        visible={followModalVisible}
+        onClose={() => setFollowModalVisible(false)}
+        initialTab={followModalTab}
+      />
     </View>
   );
 }
@@ -299,98 +368,108 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
   },
   profileHeader: {
+    padding: 15,
+    backgroundColor: '#1a1a1a',
+  },
+  topRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 30,
-    backgroundColor: '#2a2a2a',
+    marginBottom: 12,
   },
   avatarContainer: {
-    marginBottom: 15,
+    marginRight: 12,
   },
-  editAvatarButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#FF6800',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
+  profilePicture: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#3a3a3a',
+  },
+  userInfoContainer: {
+    flex: 1,
   },
   username: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 10,
+    marginBottom: 2,
+  },
+  playerID: {
+    fontSize: 12,
+    color: '#999',
   },
   bioContainer: {
     width: '100%',
-    paddingHorizontal: 30,
-    paddingVertical: 10,
-    marginBottom: 15,
-    alignItems: 'center',
+    marginBottom: 12,
+    paddingVertical: 6,
   },
   bioText: {
     fontSize: 14,
     color: '#fff',
-    textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   bioPlaceholder: {
     fontSize: 14,
     color: '#666',
-    textAlign: 'center',
-    fontStyle: 'italic',
   },
-  actionButtons: {
+  statsAndButtonsRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
-    gap: 10,
-  },
-  editProfileButton: {
-    backgroundColor: '#3a3a3a',
-    paddingHorizontal: 30,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  editProfileText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  settingsButtonMain: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#3a3a3a',
-    borderRadius: 22,
+    justifyContent: 'space-between',
   },
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    maxWidth: 350,
-  },
-  statBox: {
     alignItems: 'center',
-    padding: 15,
+    flex: 0.45,
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: '#444',
   },
   statNumber: {
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 5,
+    marginBottom: 2,
   },
   statLabel: {
+    fontSize: 10,
+    color: '#999',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 0.5,
+    justifyContent: 'flex-end',
+  },
+  editProfileButton: {
+    backgroundColor: '#3a3a3a',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  editProfileText: {
+    color: '#fff',
     fontSize: 13,
-    color: '#aaa',
+    fontWeight: '600',
+  },
+  settingsButtonMain: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#3a3a3a',
+    borderRadius: 6,
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: '#1a1a1a',
     borderBottomWidth: 1,
     borderBottomColor: '#3a3a3a',
     paddingVertical: 10,
@@ -426,7 +505,7 @@ const styles = StyleSheet.create({
   lineupCard: {
     width: '47%',
     margin: 5,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: '#1a1a1a',
     borderRadius: 10,
     overflow: 'hidden',
     position: 'relative',
@@ -450,7 +529,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: '#FF6800',
+    backgroundColor: '#5E98D9',
     borderRadius: 15,
     width: 30,
     height: 30,
@@ -495,7 +574,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   tag: {
-    backgroundColor: '#FF6800',
+    backgroundColor: '#4a4a4a',
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 4,

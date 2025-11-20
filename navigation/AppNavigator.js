@@ -14,6 +14,7 @@ import PostScreen from '../screens/PostScreen';
 import PreviewPostScreen from '../screens/PreviewPostScreen';
 import TacticsScreen from '../screens/TacticsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 import SearchLineupsScreen from '../screens/SearchLineupsScreen';
 
 const Tab = createBottomTabNavigator();
@@ -33,10 +34,10 @@ function HomeStack() {
         },
       }}
     >
-      <Stack.Screen 
-        name="MapSelection" 
+      <Stack.Screen
+        name="MapSelection"
         component={MapSelectionScreen}
-        options={{ title: 'CS Lineups' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="LineupGrid" 
@@ -140,9 +141,19 @@ function ProfileStack() {
         options={{ title: 'Profile' }}
       />
       <Stack.Screen 
-        name="SearchLineups" 
+        name="EditProfile" 
+        component={EditProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SearchLineups"
         component={SearchLineupsScreen}
         options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="LineupDetail"
+        component={LineupDetailScreen}
+        options={{ title: 'Lineup Detail' }}
       />
     </Stack.Navigator>
   );
