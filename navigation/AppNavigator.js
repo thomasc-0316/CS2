@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 
 // Screens
-import MapSelectionScreen from '../screens/MapSelectionScreen';
+import HomeScreen from '../screens/HomeScreen';
 import LineupGridScreen from '../screens/LineupGridScreen';
 import LineupDetailScreen from '../screens/LineupDetailScreen';
 import HotScreen from '../screens/HotScreen';
@@ -34,10 +34,10 @@ function HomeStack() {
         },
       }}
     >
-      <Stack.Screen
-        name="MapSelection"
-        component={MapSelectionScreen}
-        options={{ headerShown: false }}
+      <Stack.Screen 
+        name="HomeMain" 
+        component={HomeScreen}
+        options={{ title: 'CS Lineups' }}
       />
       <Stack.Screen 
         name="LineupGrid" 
@@ -145,15 +145,10 @@ function ProfileStack() {
         component={EditProfileScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen
-        name="SearchLineups"
+      <Stack.Screen 
+        name="SearchLineups" 
         component={SearchLineupsScreen}
         options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="LineupDetail"
-        component={LineupDetailScreen}
-        options={{ title: 'Lineup Detail' }}
       />
     </Stack.Navigator>
   );
