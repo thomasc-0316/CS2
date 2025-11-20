@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { Asset } from 'expo-asset';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +25,7 @@ export default function LineupDetailScreen({ route }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showThirdPerson, setShowThirdPerson] = useState(false);
   const [commentsVisible, setCommentsVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [standImageLoading, setStandImageLoading] = useState(true);
   const [aimImageLoading, setAimImageLoading] = useState(true);
@@ -54,8 +55,27 @@ export default function LineupDetailScreen({ route }) {
     setImageViewerVisible(true);
   };
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    // Simulate refresh - in a real app, you'd refetch data here
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  };
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#FF6800"
+          colors={['#FF6800']}
+          progressBackgroundColor="#3a3a3a"
+        />
+      }
+    >
       {/* Header Info */}
       <View style={styles.header}>
         {/* Title Row with Favorite Button */}

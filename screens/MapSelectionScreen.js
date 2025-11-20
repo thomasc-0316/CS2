@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Platform, Animated } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Platform, Animated, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { LINEUPS } from '../data/lineups';
@@ -53,6 +53,7 @@ export default function MapSelectionScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterVisible, setFilterVisible] = useState(false);
   const [slideAnim] = useState(new Animated.Value(300));
+  const [refreshing, setRefreshing] = useState(false);
   const { getFollowing } = useFollow();
   const { getUpvoteCount } = useUpvotes();
 
@@ -175,6 +176,14 @@ export default function MapSelectionScreen({ navigation }) {
     }
   };
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    // Simulate refresh - in a real app, you'd refetch data here
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  };
+
   const renderLineupCard = ({ item }) => (
     <LineupCard item={item} navigation={navigation} getMapName={getMapName} />
   );
@@ -252,6 +261,15 @@ export default function MapSelectionScreen({ navigation }) {
         keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         contentContainerStyle={styles.grid}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#FF6800"
+            colors={['#FF6800']}
+            progressBackgroundColor="#3a3a3a"
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons

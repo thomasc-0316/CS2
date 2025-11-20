@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Platform, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -116,6 +116,7 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState('favorites');
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalTab, setFollowModalTab] = useState('followers');
+  const [refreshing, setRefreshing] = useState(false);
 
   const favoriteIds = getFavorites();
   const favoriteLineups = LINEUPS.filter(lineup => favoriteIds.includes(lineup.id));
@@ -340,6 +341,14 @@ export default function ProfileScreen() {
     );
   };
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    // Simulate refresh - in a real app, you'd refetch data here
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  };
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -350,6 +359,15 @@ export default function ProfileScreen() {
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmptyState}
         contentContainerStyle={styles.grid}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#FF6800"
+            colors={['#FF6800']}
+            progressBackgroundColor="#3a3a3a"
+          />
+        }
       />
 
       {/* Followers/Following Modal */}

@@ -8,7 +8,8 @@ import {
   Image,
   Animated,
   TextInput,
-  ActivityIndicator
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LINEUPS } from '../data/lineups';
@@ -61,7 +62,8 @@ export default function LineupGridScreen({ navigation, route }) {
   const [filterVisible, setFilterVisible] = useState(false);
   const [slideAnim] = useState(new Animated.Value(300));
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [refreshing, setRefreshing] = useState(false);
+
   // Applied filter states (arrays for multi-select)
   const [selectedSides, setSelectedSides] = useState([]);
   const [selectedSites, setSelectedSites] = useState([]);
@@ -152,6 +154,14 @@ export default function LineupGridScreen({ navigation, route }) {
     }
   };
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    // Simulate refresh - in a real app, you'd refetch data here
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  };
+
   const renderLineupCard = ({ item }) => (
     <LineupCard item={item} navigation={navigation} />
   );
@@ -183,6 +193,15 @@ export default function LineupGridScreen({ navigation, route }) {
         numColumns={2}
         contentContainerStyle={styles.grid}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#FF6800"
+            colors={['#FF6800']}
+            progressBackgroundColor="#3a3a3a"
+          />
+        }
       />
   
       {/* Filter Panel Overlay */}

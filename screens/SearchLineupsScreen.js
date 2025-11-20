@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
   TouchableOpacity,
   Image,
   TextInput,
-  SafeAreaView
+  SafeAreaView,
+  RefreshControl
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LINEUPS } from '../data/lineups';
@@ -17,6 +18,7 @@ import { useFavorites } from '../context/FavoritesContext';
 
 export default function SearchLineupsScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   const { getUpvoteCount } = useUpvotes();
   const { getFavorites } = useFavorites();
 
@@ -87,6 +89,14 @@ export default function SearchLineupsScreen({ navigation }) {
     </View>
   );
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    // Simulate refresh - in a real app, you'd refetch data here
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header with Avatar and Buttons */}
@@ -133,6 +143,15 @@ export default function SearchLineupsScreen({ navigation }) {
         ListEmptyComponent={renderEmptyState}
         contentContainerStyle={styles.grid}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#FF6800"
+            colors={['#FF6800']}
+            progressBackgroundColor="#3a3a3a"
+          />
+        }
       />
     </SafeAreaView>
   );

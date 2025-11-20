@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   Image,
   Animated,
-  ActivityIndicator
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -69,6 +70,7 @@ export default function HotScreen() {
   const [timeFilter, setTimeFilter] = useState('all'); // 'week', 'month', 'all'
   const [filterVisible, setFilterVisible] = useState(false);
   const [slideAnim] = useState(new Animated.Value(300));
+  const [refreshing, setRefreshing] = useState(false);
 
   // Applied filter states (arrays for multi-select)
   const [selectedSides, setSelectedSides] = useState([]);
@@ -171,6 +173,14 @@ export default function HotScreen() {
     return map ? map.name : 'Unknown';
   };
 
+  const onRefresh = () => {
+    setRefreshing(true);
+    // Simulate refresh - in a real app, you'd refetch data here
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
+  };
+
   const renderHeader = () => (
     <View style={styles.header}>
       {/* Time Filter Buttons */}
@@ -224,6 +234,15 @@ export default function HotScreen() {
         numColumns={2}
         ListHeaderComponent={renderHeader}
         contentContainerStyle={styles.grid}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#FF6800"
+            colors={['#FF6800']}
+            progressBackgroundColor="#3a3a3a"
+          />
+        }
       />
 
       {/* Filter Panel Overlay */}
