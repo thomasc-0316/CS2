@@ -63,22 +63,13 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Top Header with Menu and Tabs */}
+      {/* Top Header with Menu, Tabs, and Search */}
       <View style={styles.topHeader}>
         <TouchableOpacity style={styles.menuButton}>
-          <Ionicons name="menu" size={28} color="#fff" />
+          <Ionicons name="menu" size={26} color="#fff" />
         </TouchableOpacity>
 
         <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.headerTab, activeTab === 'explore' && styles.headerTabActive]}
-            onPress={() => setActiveTab('explore')}
-          >
-            <Text style={[styles.headerTabText, activeTab === 'explore' && styles.headerTabTextActive]}>
-              Explore
-            </Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={[styles.headerTab, activeTab === 'following' && styles.headerTabActive]}
             onPress={() => setActiveTab('following')}
@@ -87,47 +78,72 @@ export default function HomeScreen({ navigation }) {
               Following
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.headerTab, activeTab === 'explore' && styles.headerTabActive]}
+            onPress={() => setActiveTab('explore')}
+          >
+            <Text style={[styles.headerTabText, activeTab === 'explore' && styles.headerTabTextActive]}>
+              Explore
+            </Text>
+          </TouchableOpacity>
         </View>
-      </View>
 
-      {/* Filter Toggle Buttons */}
-      <View style={styles.toggleContainer}>
-        <TouchableOpacity
-          style={[styles.toggleButton, filter === 'all' && styles.toggleButtonActive]}
-          onPress={() => setFilter('all')}
-        >
-          <Text style={[styles.toggleText, filter === 'all' && styles.toggleTextActive]}>
-            All
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.toggleButton, filter === 'active' && styles.toggleButtonActive]}
-          onPress={() => setFilter('active')}
-        >
-          <Text style={[styles.toggleText, filter === 'active' && styles.toggleTextActive]}>
-            Active Duty
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.toggleButton, filter === 'reserve' && styles.toggleButtonActive]}
-          onPress={() => setFilter('reserve')}
-        >
-          <Text style={[styles.toggleText, filter === 'reserve' && styles.toggleTextActive]}>
-            Reserve
-          </Text>
+        <TouchableOpacity style={styles.searchButton}>
+          <Ionicons name="search" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* Map Grid */}
-      <FlatList
-        data={filteredMaps}
-        renderItem={renderMapCard}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={2}
-        contentContainerStyle={styles.grid}
-      />
+      {/* Filter Toggle Buttons - Only show on Explore tab */}
+      {activeTab === 'explore' && (
+        <View style={styles.toggleContainer}>
+          <TouchableOpacity
+            style={[styles.toggleButton, filter === 'all' && styles.toggleButtonActive]}
+            onPress={() => setFilter('all')}
+          >
+            <Text style={[styles.toggleText, filter === 'all' && styles.toggleTextActive]}>
+              All
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.toggleButton, filter === 'active' && styles.toggleButtonActive]}
+            onPress={() => setFilter('active')}
+          >
+            <Text style={[styles.toggleText, filter === 'active' && styles.toggleTextActive]}>
+              Active Duty
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.toggleButton, filter === 'reserve' && styles.toggleButtonActive]}
+            onPress={() => setFilter('reserve')}
+          >
+            <Text style={[styles.toggleText, filter === 'reserve' && styles.toggleTextActive]}>
+              Reserve
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Content based on active tab */}
+      {activeTab === 'explore' ? (
+        <FlatList
+          data={filteredMaps}
+          renderItem={renderMapCard}
+          keyExtractor={(item) => item.id.toString()}
+          numColumns={2}
+          contentContainerStyle={styles.grid}
+        />
+      ) : (
+        <View style={styles.followingContainer}>
+          <Ionicons name="people-outline" size={64} color="#555" />
+          <Text style={styles.followingTitle}>No Following Yet</Text>
+          <Text style={styles.followingText}>
+            Follow creators to see their lineups here
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -140,61 +156,74 @@ const styles = StyleSheet.create({
   topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    backgroundColor: '#2a2a2a',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 55,
+    paddingBottom: 10,
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#333',
   },
   menuButton: {
-    marginRight: 15,
+    padding: 4,
+  },
+  searchButton: {
+    padding: 4,
   },
   tabContainer: {
-    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 30,
   },
   headerTab: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    marginHorizontal: 5,
+    paddingVertical: 6,
   },
   headerTabActive: {
     borderBottomWidth: 2,
     borderBottomColor: '#FF6800',
   },
   headerTabText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#aaa',
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#888',
   },
   headerTabTextActive: {
     color: '#fff',
+    fontWeight: '600',
   },
   toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    padding: 15,
-    backgroundColor: '#2a2a2a',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#1a1a1a',
+    gap: 12,
   },
   toggleButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    marginHorizontal: 5,
-    borderRadius: 20,
-    backgroundColor: '#3a3a3a',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#333',
   },
   toggleButtonActive: {
     backgroundColor: '#FF6800',
+    borderColor: '#FF6800',
   },
   toggleText: {
-    color: '#aaa',
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '500',
   },
   toggleTextActive: {
     color: '#fff',
+    fontWeight: '600',
   },
   grid: {
-    padding: 10,
+    paddingHorizontal: 10,
+    paddingTop: 0,
+    paddingBottom: 10,
   },
   mapCard: {
     width: '44%',
@@ -242,5 +271,24 @@ const styles = StyleSheet.create({
   },
   lockIcon: {
     fontSize: 30,
+  },
+  followingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  followingTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  followingText: {
+    fontSize: 15,
+    color: '#888',
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

@@ -34,10 +34,10 @@ function HomeStack() {
         },
       }}
     >
-      <Stack.Screen 
-        name="HomeMain" 
+      <Stack.Screen
+        name="HomeMain"
         component={HomeScreen}
-        options={{ title: 'CS Lineups' }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen 
         name="LineupGrid" 
