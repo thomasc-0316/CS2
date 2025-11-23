@@ -19,6 +19,9 @@ function LineupCard({ item, navigation, getMapName }) {
       <Image
         source={typeof item.landImage === 'string' ? { uri: item.landImage } : item.landImage}
         style={styles.cardImage}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        transition={200}
         onLoadStart={() => setImageLoading(true)}
         onLoad={() => setImageLoading(false)}
       />
@@ -261,6 +264,10 @@ export default function MapSelectionScreen({ navigation }) {
         keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         contentContainerStyle={styles.grid}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={6}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

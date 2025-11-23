@@ -28,6 +28,9 @@ function DraftCard({ item, navigation, onDelete }) {
       <Image
         source={{ uri: item.standImage }}
         style={styles.cardImage}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        transition={200}
         onLoadStart={() => setImageLoading(true)}
         onLoad={() => setImageLoading(false)}
       />
@@ -71,6 +74,9 @@ function LineupCard({ item, navigation, getMapName, getUpvoteCount }) {
       <Image
         source={typeof item.landImage === 'string' ? { uri: item.landImage } : item.landImage}
         style={styles.cardImage}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        transition={200}
         onLoadStart={() => setImageLoading(true)}
         onLoad={() => setImageLoading(false)}
       />
@@ -206,7 +212,13 @@ export default function ProfileScreen() {
           {/* Profile Picture */}
           <View style={styles.avatarContainer}>
             {profile.profilePicture ? (
-              <Image source={{ uri: profile.profilePicture }} style={styles.profilePicture} />
+              <Image
+                source={{ uri: profile.profilePicture }}
+                style={styles.profilePicture}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={200}
+              />
             ) : (
               <Ionicons name="person-circle" size={70} color="#FF6800" />
             )}
@@ -359,6 +371,10 @@ export default function ProfileScreen() {
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmptyState}
         contentContainerStyle={styles.grid}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={6}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

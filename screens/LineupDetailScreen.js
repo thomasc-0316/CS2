@@ -154,6 +154,9 @@ export default function LineupDetailScreen({ route }) {
           <Image
             source={typeof lineup.standImage === 'string' ? { uri: lineup.standImage } : lineup.standImage}
             style={styles.image}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={200}
             onLoadStart={() => setStandImageLoading(true)}
             onLoad={() => setStandImageLoading(false)}
           />
@@ -192,10 +195,13 @@ export default function LineupDetailScreen({ route }) {
           <Text style={styles.thirdPersonLabel}>Third-Person Perspective:</Text>
           <TouchableOpacity activeOpacity={0.9}>
             <Image
-              source={typeof lineup.standImageThirdPerson === 'string' 
-                ? { uri: lineup.standImageThirdPerson } 
+              source={typeof lineup.standImageThirdPerson === 'string'
+                ? { uri: lineup.standImageThirdPerson }
                 : lineup.standImageThirdPerson}
               style={styles.image}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={200}
               onLoadStart={() => setThirdPersonLoading(true)}
               onLoad={() => setThirdPersonLoading(false)}
             />
@@ -215,6 +221,9 @@ export default function LineupDetailScreen({ route }) {
           <Image
             source={typeof lineup.aimImage === 'string' ? { uri: lineup.aimImage } : lineup.aimImage}
             style={styles.image}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={200}
             onLoadStart={() => setAimImageLoading(true)}
             onLoad={() => setAimImageLoading(false)}
           />
@@ -237,6 +246,9 @@ export default function LineupDetailScreen({ route }) {
           <Image
             source={typeof lineup.landImage === 'string' ? { uri: lineup.landImage } : lineup.landImage}
             style={styles.image}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={200}
             onLoadStart={() => setLandImageLoading(true)}
             onLoad={() => setLandImageLoading(false)}
           />
