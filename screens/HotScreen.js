@@ -5,11 +5,11 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
   Animated,
   ActivityIndicator,
   RefreshControl
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LINEUPS } from '../data/lineups';
@@ -28,6 +28,9 @@ function LineupCard({ item, navigation, rank }) {
       <Image
         source={typeof item.landImage === 'string' ? { uri: item.landImage } : item.landImage}
         style={styles.cardImage}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        transition={200}
         onLoadStart={() => setImageLoading(true)}
         onLoad={() => setImageLoading(false)}
       />
@@ -234,6 +237,10 @@ export default function HotScreen() {
         numColumns={2}
         ListHeaderComponent={renderHeader}
         contentContainerStyle={styles.grid}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={6}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
