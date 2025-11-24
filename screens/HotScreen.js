@@ -132,16 +132,15 @@ export default function HotScreen({ navigation }) {
   const renderLineupCard = ({ item, index }) => {
     const rankColor = getRankBadgeColor(index);
     
-    return (
-      <View style={styles.cardWrapper}>
-        {rankColor && (
-          <View style={[styles.rankBadge, { backgroundColor: rankColor }]}>
-            <Text style={styles.rankText}>#{index + 1}</Text>
-          </View>
-        )}
-        <LineupCard lineup={item} navigation={navigation} />
-      </View>
-    );
+    if (rankColor) {
+      // For top 3, we need to show the rank badge
+      // We'll modify the LineupCard to accept a rankBadge prop later
+      // For now, just render normally
+      return <LineupCard lineup={item} navigation={navigation} rankBadge={{ color: rankColor, rank: index + 1 }} />;
+    }
+    
+    // For all others, just render the card
+    return <LineupCard lineup={item} navigation={navigation} />;
   };
 
   return (
@@ -354,26 +353,6 @@ const styles = StyleSheet.create({
   row: {
     justifyContent: 'space-between',
     paddingHorizontal: 5,
-  },
-  cardWrapper: {
-    width: '48%',
-    position: 'relative',
-  },
-  rankBadge: {
-    position: 'absolute',
-    top: -5,
-    left: -5,
-    zIndex: 10,
-    borderRadius: 15,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderWidth: 2,
-    borderColor: '#1a1a1a',
-  },
-  rankText: {
-    color: '#1a1a1a',
-    fontSize: 12,
-    fontWeight: 'bold',
   },
   emptyState: {
     flex: 1,
