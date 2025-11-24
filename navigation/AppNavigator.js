@@ -16,6 +16,9 @@ import TacticsScreen from '../screens/TacticsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import SearchLineupsScreen from '../screens/SearchLineupsScreen';
+import UserProfileScreen from '../screens/UserProfileScreen';
+import CreatorProfileScreen from '../screens/CreatorProfileScreen'; // NEW
+import { getUserById } from '../data/users'; // NEW
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -39,17 +42,31 @@ function HomeStack() {
         component={HomeScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen 
-        name="LineupGrid" 
+      <Stack.Screen
+        name="LineupGrid"
         component={LineupGridScreen}
-        options={({ route }) => ({ 
+        options={({ route }) => ({
           title: route.params?.map?.name || 'Lineups'
         })}
       />
-      <Stack.Screen 
-        name="LineupDetail" 
+      <Stack.Screen
+        name="LineupDetail"
         component={LineupDetailScreen}
         options={{ title: 'Lineup Detail' }}
+      />
+      <Stack.Screen
+        name="UserProfile"
+        component={UserProfileScreen}
+        options={({ route }) => ({
+          title: route.params?.username || 'User Profile'
+        })}
+      />
+      <Stack.Screen
+        name="CreatorProfile"
+        component={CreatorProfileScreen}
+        options={({ route }) => ({
+          title: getUserById(route.params?.userId)?.username || 'Creator Profile'
+        })}
       />
     </Stack.Navigator>
   );
@@ -69,15 +86,29 @@ function HotStack() {
         },
       }}
     >
-      <Stack.Screen 
-        name="HotMain" 
+      <Stack.Screen
+        name="HotMain"
         component={HotScreen}
         options={{ title: '🔥 Hot Lineups' }}
       />
-      <Stack.Screen 
-        name="LineupDetail" 
+      <Stack.Screen
+        name="LineupDetail"
         component={LineupDetailScreen}
         options={{ title: 'Lineup Detail' }}
+      />
+      <Stack.Screen
+        name="UserProfile"
+        component={UserProfileScreen}
+        options={({ route }) => ({
+          title: route.params?.username || 'User Profile'
+        })}
+      />
+      <Stack.Screen
+        name="CreatorProfile"
+        component={CreatorProfileScreen}
+        options={({ route }) => ({
+          title: getUserById(route.params?.userId)?.username || 'Creator Profile'
+        })}
       />
     </Stack.Navigator>
   );
@@ -135,20 +166,39 @@ function ProfileStack() {
         },
       }}
     >
-      <Stack.Screen 
-        name="ProfileMain" 
+      <Stack.Screen
+        name="ProfileMain"
         component={ProfileScreen}
         options={{ title: 'Profile' }}
       />
-      <Stack.Screen 
-        name="EditProfile" 
+      <Stack.Screen
+        name="EditProfile"
         component={EditProfileScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen 
-        name="SearchLineups" 
+      <Stack.Screen
+        name="SearchLineups"
         component={SearchLineupsScreen}
         options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="LineupDetail"
+        component={LineupDetailScreen}
+        options={{ title: 'Lineup Detail' }}
+      />
+      <Stack.Screen
+        name="UserProfile"
+        component={UserProfileScreen}
+        options={({ route }) => ({
+          title: route.params?.username || 'User Profile'
+        })}
+      />
+      <Stack.Screen
+        name="CreatorProfile"
+        component={CreatorProfileScreen}
+        options={({ route }) => ({
+          title: getUserById(route.params?.userId)?.username || 'Creator Profile'
+        })}
       />
     </Stack.Navigator>
   );
