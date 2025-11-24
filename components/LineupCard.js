@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { getUserById } from '../data/users';
 
-export default function LineupCard({ lineup, navigation }) {
+export default function LineupCard({ lineup, navigation, rankBadge }) {
   const [imageLoading, setImageLoading] = useState(true);
 
   // Get creator info
@@ -34,6 +34,13 @@ export default function LineupCard({ lineup, navigation }) {
       {imageLoading && (
         <View style={styles.imageLoadingContainer}>
           <ActivityIndicator size="small" color="#666" />
+        </View>
+      )}
+
+      {/* Rank Badge (for Hot screen) */}
+      {rankBadge && (
+        <View style={[styles.rankBadge, { backgroundColor: rankBadge.color }]}>
+          <Text style={styles.rankText}>#{rankBadge.rank}</Text>
         </View>
       )}
 
@@ -105,6 +112,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#5E98D9',
     borderRadius: 12,
     padding: 4,
+  },
+  rankBadge: {
+    position: 'absolute',
+    top: -5,
+    left: -5,
+    zIndex: 10,
+    borderRadius: 15,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 2,
+    borderColor: '#1a1a1a',
+  },
+  rankText: {
+    color: '#1a1a1a',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   cardInfo: {
     padding: 10,
