@@ -2,12 +2,26 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ImageBackground } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MAPS } from '../data/maps';
+import { LINEUPS } from '../data/lineups';
+import { useFollow } from '../context/FollowContext';
+import CreatorDiscovery from '../components/CreatorDiscovery';
+import LineupCard from '../components/LineupCard';
 
 export default function HomeScreen({ navigation }) {
   const [activeTab, setActiveTab] = useState('explore'); // 'explore' or 'following'
   const [filter, setFilter] = useState('all'); // 'all', 'active', 'reserve'
+  const { getFollowing } = useFollow();
 
-  // Filter maps based on toggle
+  const followingUsers = getFollowing();
+  const followingUserIds = followingUsers.map(user => user.id);
+  const isFollowingAnyone = followingUserIds.length > 0;
+
+  // Get lineups from followed creators
+  const followingLineups = LINEUPS.filter(lineup => 
+    followingUserIds.includes(lineup.creatorId)
+  ).sort((a, b) => b.uploadedAt - a.uploadedAt);
+
+  // Filter maps based on toggle (for Explore tab)
   const getFilteredMaps = () => {
     if (filter === 'active') {
       return MAPS.filter(map => map.isActiveDuty);
@@ -61,6 +75,37 @@ export default function HomeScreen({ navigation }) {
     );
   };
 
+  // Render Following Tab Content
+  const renderFollowingContent = () => {
+    if (!isFollowingAnyone) {
+      // Show Creator Discovery when not following anyone
+      return <CreatorDiscovery navigation={navigation} />;
+    }
+
+    // Show lineups from followed creators as a grid (like Explore)
+    return (
+      <View style={styles.followingContentContainer}>
+        <View style={styles.followingHeader}>
+          <Ionicons name="people" size={20} color="#FF6800" />
+          <Text style={styles.followingHeaderText}>
+            Lineups from creators you follow
+          </Text>
+        </View>
+        
+        <FlatList
+          data={followingLineups}
+          renderItem={({ item }) => (
+            <LineupCard lineup={item} navigation={navigation} />
+          )}
+          keyExtractor={(item) => item.id.toString()}
+          numColumns={2}
+          contentContainerStyle={styles.lineupGrid}
+          columnWrapperStyle={styles.lineupRow}
+        />
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Top Header with Menu, Tabs, and Search */}
@@ -94,55 +139,50 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Filter Toggle Buttons - Only show on Explore tab */}
-      {activeTab === 'explore' && (
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[styles.toggleButton, filter === 'all' && styles.toggleButtonActive]}
-            onPress={() => setFilter('all')}
-          >
-            <Text style={[styles.toggleText, filter === 'all' && styles.toggleTextActive]}>
-              All
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.toggleButton, filter === 'active' && styles.toggleButtonActive]}
-            onPress={() => setFilter('active')}
-          >
-            <Text style={[styles.toggleText, filter === 'active' && styles.toggleTextActive]}>
-              Active Duty
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.toggleButton, filter === 'reserve' && styles.toggleButtonActive]}
-            onPress={() => setFilter('reserve')}
-          >
-            <Text style={[styles.toggleText, filter === 'reserve' && styles.toggleTextActive]}>
-              Reserve
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {/* Content based on active tab */}
-      {activeTab === 'explore' ? (
-        <FlatList
-          data={filteredMaps}
-          renderItem={renderMapCard}
-          keyExtractor={(item) => item.id.toString()}
-          numColumns={2}
-          contentContainerStyle={styles.grid}
-        />
+      {activeTab === 'following' ? (
+        renderFollowingContent()
       ) : (
-        <View style={styles.followingContainer}>
-          <Ionicons name="people-outline" size={64} color="#555" />
-          <Text style={styles.followingTitle}>No Following Yet</Text>
-          <Text style={styles.followingText}>
-            Follow creators to see their lineups here
-          </Text>
-        </View>
+        <>
+          {/* Map Filter Toggle */}
+          <View style={styles.toggleContainer}>
+            <TouchableOpacity
+              style={[styles.toggleButton, filter === 'all' && styles.toggleButtonActive]}
+              onPress={() => setFilter('all')}
+            >
+              <Text style={[styles.toggleText, filter === 'all' && styles.toggleTextActive]}>
+                All
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.toggleButton, filter === 'active' && styles.toggleButtonActive]}
+              onPress={() => setFilter('active')}
+            >
+              <Text style={[styles.toggleText, filter === 'active' && styles.toggleTextActive]}>
+                Active Duty
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.toggleButton, filter === 'reserve' && styles.toggleButtonActive]}
+              onPress={() => setFilter('reserve')}
+            >
+              <Text style={[styles.toggleText, filter === 'reserve' && styles.toggleTextActive]}>
+                Reserve
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Map Grid */}
+          <FlatList
+            data={filteredMaps}
+            renderItem={renderMapCard}
+            keyExtractor={(item) => item.id.toString()}
+            numColumns={2}
+            contentContainerStyle={styles.grid}
+          />
+        </>
       )}
     </View>
   );
@@ -157,23 +197,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 55,
-    paddingBottom: 10,
-    backgroundColor: '#1a1a1a',
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#333',
+    paddingTop: 50,
+    paddingBottom: 15,
+    paddingHorizontal: 15,
+    backgroundColor: '#0a0a0a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
   },
   menuButton: {
-    padding: 4,
-  },
-  searchButton: {
-    padding: 4,
+    padding: 5,
   },
   tabContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 30,
+    gap: 20,
   },
   headerTab: {
     paddingVertical: 6,
@@ -190,6 +226,9 @@ const styles = StyleSheet.create({
   headerTabTextActive: {
     color: '#fff',
     fontWeight: '600',
+  },
+  searchButton: {
+    padding: 5,
   },
   toggleContainer: {
     flexDirection: 'row',
@@ -272,23 +311,32 @@ const styles = StyleSheet.create({
   lockIcon: {
     fontSize: 30,
   },
-  followingContainer: {
+  // Following feed styles
+  followingContentContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
   },
-  followingTitle: {
-    fontSize: 20,
+  followingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    backgroundColor: '#2a2a2a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#3a3a3a',
+  },
+  followingHeaderText: {
+    fontSize: 15,
     fontWeight: '600',
     color: '#fff',
-    marginTop: 20,
-    marginBottom: 8,
+    marginLeft: 8,
   },
-  followingText: {
-    fontSize: 15,
-    color: '#888',
-    textAlign: 'center',
-    lineHeight: 22,
+  lineupGrid: {
+    paddingHorizontal: 5,
+    paddingTop: 5,
+    paddingBottom: 10,
+  },
+  lineupRow: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 5,
   },
 });

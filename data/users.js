@@ -1,0 +1,103 @@
+// Mock users/creators for the app
+export const USERS = [
+  {
+    id: 'user_official',
+    username: 'Textbook',
+    bio: 'Official CS Lineups account | Textbook lineups for competitive play',
+    pronouns: '',
+    profilePicture: null,
+    followers: 45782,
+    following: 0,
+    isVerified: true,
+  },
+  {
+    id: 'user_001',
+    username: 'ProNader',
+    bio: 'Professional CS2 player | Lineup specialist',
+    pronouns: 'he/him',
+    profilePicture: null,
+    followers: 15234,
+    following: 234,
+    isVerified: true,
+  },
+  {
+    id: 'user_002',
+    username: 'SmokeQueen',
+    bio: 'Teaching smokes since 2015 🔥',
+    pronouns: 'she/her',
+    profilePicture: null,
+    followers: 8932,
+    following: 145,
+    isVerified: true,
+  },
+  {
+    id: 'user_003',
+    username: 'FlashMaster',
+    bio: 'Flash lineups for every map | Team Liquid',
+    pronouns: 'he/him',
+    profilePicture: null,
+    followers: 12456,
+    following: 89,
+    isVerified: true,
+  },
+  {
+    id: 'user_004',
+    username: 'TacticianPro',
+    bio: 'IGLing since forever | Share my strats',
+    pronouns: 'they/them',
+    profilePicture: null,
+    followers: 6723,
+    following: 312,
+    isVerified: false,
+  },
+  {
+    id: 'user_005',
+    username: 'MollyGod',
+    bio: 'Molotov specialist | Burning sites since 2018',
+    pronouns: 'he/him',
+    profilePicture: null,
+    followers: 9845,
+    following: 156,
+    isVerified: true,
+  },
+  {
+    id: 'user_006',
+    username: 'NadeExpert',
+    bio: 'All nades, all maps | Check my lineups',
+    pronouns: 'she/her',
+    profilePicture: null,
+    followers: 11234,
+    following: 203,
+    isVerified: true,
+  },
+  {
+    id: 'user_007',
+    username: 'UtilityKing',
+    bio: 'Utility usage coach | FaZe Clan',
+    pronouns: 'he/him',
+    profilePicture: null,
+    followers: 18967,
+    following: 67,
+    isVerified: true,
+  },
+  {
+    id: 'user_008',
+    username: 'CasualPlayer',
+    bio: 'Just sharing what I know',
+    pronouns: '',
+    profilePicture: null,
+    followers: 423,
+    following: 89,
+    isVerified: false,
+  },
+];
+
+// Helper function to get user by ID
+export const getUserById = (userId) => {
+  return USERS.find(user => user.id === userId);
+};
+
+// Helper function to get multiple users by IDs
+export const getUsersByIds = (userIds) => {
+  return USERS.filter(user => userIds.includes(user.id));
+};

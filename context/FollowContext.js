@@ -91,6 +91,12 @@ export const FollowProvider = ({ children }) => {
     return Object.keys(followers).length;
   };
 
+  // Get follower count for a specific user (how many people follow them)
+  const getUserFollowerCount = (userId) => {
+    // Check if the current user is following this user
+    return isFollowing(userId) ? 1 : 0;
+  };
+
   return (
     <FollowContext.Provider value={{
       followUser,
@@ -100,6 +106,7 @@ export const FollowProvider = ({ children }) => {
       getFollowers,
       getFollowingCount,
       getFollowersCount,
+      getUserFollowerCount,
     }}>
       {children}
     </FollowContext.Provider>

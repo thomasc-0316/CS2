@@ -69,7 +69,7 @@ function LineupCard({ item, navigation, getMapName, getUpvoteCount }) {
   return (
     <TouchableOpacity
       style={styles.lineupCard}
-      onPress={() => navigation.navigate('LineupDetail', { lineup: item })}
+      onPress={() => navigation.navigate('LineupDetail', { lineupId: item.id })}
     >
       <Image
         source={typeof item.landImage === 'string' ? { uri: item.landImage } : item.landImage}
@@ -242,14 +242,14 @@ export default function ProfileScreen() {
         <View style={styles.statsAndButtonsRow}>
           {/* Stats (left side, compact) */}
           <View style={styles.statsContainer}>
-            <TouchableOpacity style={styles.statItem} onPress={openFollowingModal}>
-              <Text style={styles.statNumber}>{getFollowingCount()}</Text>
-              <Text style={styles.statLabel}>Following</Text>
-            </TouchableOpacity>
-            <View style={styles.statDivider} />
             <TouchableOpacity style={styles.statItem} onPress={openFollowersModal}>
               <Text style={styles.statNumber}>{getFollowersCount()}</Text>
               <Text style={styles.statLabel}>Followers</Text>
+            </TouchableOpacity>
+            <View style={styles.statDivider} />
+            <TouchableOpacity style={styles.statItem} onPress={openFollowingModal}>
+              <Text style={styles.statNumber}>{getFollowingCount()}</Text>
+              <Text style={styles.statLabel}>Following</Text>
             </TouchableOpacity>
             <View style={styles.statDivider} />
             <TouchableOpacity style={styles.statItem}>

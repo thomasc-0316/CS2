@@ -1,10 +1,13 @@
 export const LINEUPS = [
-  // ========== DUST II - TEXTBOOK LINEUPS ==========
+  // ========== DUST II - T SIDE LINEUPS ==========
   
-  // 1. Long Cross Smoke
+  // 1. Long Cross Smoke - by Essentials
   {
     id: 1,
     mapId: 1,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'T',
     site: 'A',
     nadeType: 'Smoke',
@@ -17,13 +20,16 @@ export const LINEUPS = [
     throwType: 'Jump Throw',
     uploadedAt: new Date('2024-11-18'),
     upvotes: 523,
-    isTextbook: true, // Add this
+    isTextbook: true,
   },
   
-  // 2. Cat Smoke
+  // 2. Cat Smoke - by Essentials
   {
     id: 2,
     mapId: 1,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'T',
     site: 'A',
     nadeType: 'Smoke',
@@ -36,13 +42,16 @@ export const LINEUPS = [
     throwType: 'Jump Throw',
     uploadedAt: new Date('2024-11-18'),
     upvotes: 445,
-    isTextbook: true, // Add this
+    isTextbook: true,
   },
   
-  // 3. Mid Doors Smoke
+  // 3. Mid Doors Smoke - by Essentials
   {
     id: 3,
     mapId: 1,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'T',
     site: 'Mid',
     nadeType: 'Smoke',
@@ -54,13 +63,16 @@ export const LINEUPS = [
     throwType: 'Jump Throw',
     uploadedAt: new Date('2024-11-18'),
     upvotes: 489,
-    isTextbook: true, // Add this
+    isTextbook: true,
   },
   
-  // 4. Xbox Smoke
+  // 4. Xbox Smoke - by Essentials
   {
     id: 4,
     mapId: 1,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'T',
     site: 'Mid',
     nadeType: 'Smoke',
@@ -73,13 +85,16 @@ export const LINEUPS = [
     throwType: 'Jump Throw',
     uploadedAt: new Date('2024-11-18'),
     upvotes: 567,
-    isTextbook: true, // Add this
+    isTextbook: true,
   },
   
-  // 5. B Doors Smoke
+  // 5. B Doors Smoke - by Essentials
   {
     id: 5,
     mapId: 1,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'T',
     site: 'B',
     nadeType: 'Smoke',
@@ -92,15 +107,18 @@ export const LINEUPS = [
     throwType: 'Left Click',
     uploadedAt: new Date('2024-11-18'),
     upvotes: 412,
-    isTextbook: true, // Add this
+    isTextbook: true,
   },
 
   // ========== DUST II - CT SIDE LINEUPS ==========
 
-  // 6. A Door Smoke (CT)
+  // 6. A Door Smoke (CT) - by Essentials
   {
     id: 11,
     mapId: 1,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'CT',
     site: 'A',
     nadeType: 'Smoke',
@@ -115,13 +133,16 @@ export const LINEUPS = [
     isTextbook: true,
   },
 
-  // 7. A Long Car Flash (CT)
+  // 7. A Long Car Flash (CT) - by Essentials
   {
     id: 12,
     mapId: 1,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'CT',
     site: 'A',
-    nadeType: 'Flashbang',
+    nadeType: 'Flash',
     title: 'A Long Car Flash',
     description: 'Flash for long car from A site',
     standImage: require('../assets/lineup_images/dust2/CT/dust2_a_long_car_self_flash_stand.png'),
@@ -133,10 +154,13 @@ export const LINEUPS = [
     isTextbook: true,
   },
 
-  // 8. B Entrance Smoke (CT)
+  // 8. B Entrance Smoke (CT) - by Essentials
   {
     id: 13,
     mapId: 1,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'CT',
     site: 'B',
     nadeType: 'Smoke',
@@ -151,10 +175,13 @@ export const LINEUPS = [
     isTextbook: true,
   },
 
-  // 9. B Site Molly (CT)
+  // 9. B Site Molly (CT) - by Essentials
   {
     id: 14,
     mapId: 1,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'CT',
     site: 'B',
     nadeType: 'Molotov',
@@ -169,10 +196,13 @@ export const LINEUPS = [
     isTextbook: true,
   },
 
-  // 10. Mid Suicide Smoke (CT)
+  // 10. Mid Suicide Smoke (CT) - by Essentials
   {
     id: 15,
     mapId: 1,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'CT',
     site: 'Mid',
     nadeType: 'Smoke',
@@ -189,10 +219,13 @@ export const LINEUPS = [
 
   // ========== MIRAGE - T SIDE LINEUPS ==========
 
-  // 11. CT Smoke (Mirage)
+  // 11. CT Smoke (Mirage) - by Essentials
   {
     id: 16,
     mapId: 2,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'T',
     site: 'A',
     nadeType: 'Smoke',
@@ -207,10 +240,13 @@ export const LINEUPS = [
     isTextbook: true,
   },
 
-  // 12. A Cross Smoke (Mirage)
+  // 12. A Cross Smoke (Mirage) - by Essentials
   {
     id: 17,
     mapId: 2,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'T',
     site: 'A',
     nadeType: 'Smoke',
@@ -226,10 +262,13 @@ export const LINEUPS = [
     isTextbook: true,
   },
 
-  // 13. Connector Smoke (Mirage)
+  // 13. Connector Smoke (Mirage) - by Essentials
   {
     id: 18,
     mapId: 2,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'T',
     site: 'A',
     nadeType: 'Smoke',
@@ -245,10 +284,13 @@ export const LINEUPS = [
     isTextbook: true,
   },
 
-  // 14. CT/Cross/Stairs Triple Smoke (Mirage)
+  // 14. CT/Cross/Stairs Triple Smoke (Mirage) - by Essentials
   {
     id: 19,
     mapId: 2,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'T',
     site: 'A',
     nadeType: 'Smoke',
@@ -263,10 +305,13 @@ export const LINEUPS = [
     isTextbook: true,
   },
 
-  // 15. Cat Smoke (Mirage)
+  // 15. Cat Smoke (Mirage) - by Essentials
   {
     id: 20,
     mapId: 2,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'T',
     site: 'Mid',
     nadeType: 'Smoke',
@@ -282,10 +327,13 @@ export const LINEUPS = [
     isTextbook: true,
   },
 
-  // 16. Mid Window Smoke (Mirage)
+  // 16. Mid Window Smoke (Mirage) - by Essentials
   {
     id: 21,
     mapId: 2,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'T',
     site: 'Mid',
     nadeType: 'Smoke',
@@ -301,10 +349,13 @@ export const LINEUPS = [
     isTextbook: true,
   },
 
-  // 17. B Window/Door/Cat Triple Smoke (Mirage)
+  // 17. B Window/Door/Cat Triple Smoke (Mirage) - by Essentials
   {
     id: 22,
     mapId: 2,
+    creatorId: 'user_official',
+    creatorUsername: 'Textbook',
+    creatorAvatar: null,
     side: 'T',
     site: 'B',
     nadeType: 'Smoke',

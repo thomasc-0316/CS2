@@ -1,36 +1,49 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { Asset } from 'expo-asset';
 import { Ionicons } from '@expo/vector-icons';
 import ImageView from 'react-native-image-viewing';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useFavorites } from '../context/FavoritesContext';
-import { useComments } from '../context/CommentsContext';
-import CommentsModal from '../components/CommentsModal';
+import { useFollow } from '../context/FollowContext';
+import { getUserById } from '../data/users';
+import { LINEUPS } from '../data/lineups';
 
-export default function LineupDetailScreen({ route }) {
-  const { lineup } = route.params;
+export default function LineupDetailScreen({ route, navigation }) {
+  const { lineupId } = route.params;
+  const lineup = LINEUPS.find(l => l.id === lineupId);
   const { toggleUpvote, isUpvoted, getUpvoteCount } = useUpvotes();
   const { toggleFavorite, isFavorite } = useFavorites();
-  const { getCommentCount } = useComments();
+  const { isFollowing, followUser, unfollowUser } = useFollow();
+
+  if (!lineup) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={60} color="#666" />
+        <Text style={styles.errorText}>Lineup not found</Text>
+      </View>
+    );
+  }
 
   const upvoted = isUpvoted(lineup.id);
   const upvoteCount = getUpvoteCount(lineup);
   const favorited = isFavorite(lineup.id);
-  const commentCount = getCommentCount(lineup.id);
+
+  // Get creator info
+  const creator = getUserById(lineup.creatorId);
+  const isFollowingCreator = creator ? isFollowing(creator.id) : false;
 
   // Image viewing state
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showThirdPerson, setShowThirdPerson] = useState(false);
-  const [commentsVisible, setCommentsVisible] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   const [standImageLoading, setStandImageLoading] = useState(true);
   const [aimImageLoading, setAimImageLoading] = useState(true);
   const [landImageLoading, setLandImageLoading] = useState(true);
   const [thirdPersonLoading, setThirdPersonLoading] = useState(true);
+  
   // Check if third person image exists
   const hasThirdPerson = !!lineup.standImageThirdPerson;
 
@@ -39,7 +52,6 @@ export default function LineupDetailScreen({ route }) {
     if (typeof imageSource === 'string') {
       return imageSource;
     }
-    // Use Asset.fromModule for local assets
     const asset = Asset.fromModule(imageSource);
     return asset.localUri || asset.uri;
   };
@@ -55,29 +67,73 @@ export default function LineupDetailScreen({ route }) {
     setImageViewerVisible(true);
   };
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    // Simulate refresh - in a real app, you'd refetch data here
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+  const handleFollowToggle = () => {
+    if (!creator) return;
+    
+    if (isFollowingCreator) {
+      unfollowUser(creator.id);
+    } else {
+      followUser(creator.id, creator.username, creator.profilePicture);
+    }
+  };
+
+  const handleCreatorPress = () => {
+    if (!creator) return;
+    navigation.navigate('CreatorProfile', { userId: creator.id });
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor="#FF6800"
-          colors={['#FF6800']}
-          progressBackgroundColor="#3a3a3a"
-        />
-      }
-    >
+    <ScrollView style={styles.container}>
       {/* Header Info */}
       <View style={styles.header}>
+        {/* Creator Row - NEW */}
+        {creator && (
+          <View style={styles.creatorRow}>
+            <TouchableOpacity 
+              style={styles.creatorInfo}
+              onPress={handleCreatorPress}
+            >
+              <View style={styles.creatorAvatarContainer}>
+                {creator.profilePicture ? (
+                  <Image
+                    source={{ uri: creator.profilePicture }}
+                    style={styles.creatorAvatar}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <Ionicons name="person-circle" size={40} color="#666" />
+                )}
+              </View>
+              <View style={styles.creatorDetails}>
+                <View style={styles.creatorNameRow}>
+                  <Text style={styles.creatorUsername}>{creator.username}</Text>
+                  {creator.isVerified && (
+                    <Ionicons name="checkmark-circle" size={16} color="#5E98D9" />
+                  )}
+                </View>
+                <Text style={styles.creatorFollowers}>
+                  {creator.followers.toLocaleString()} followers
+                </Text>
+              </View>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[
+                styles.followButton,
+                isFollowingCreator && styles.followingButton
+              ]}
+              onPress={handleFollowToggle}
+            >
+              <Text style={[
+                styles.followButtonText,
+                isFollowingCreator && styles.followingButtonText
+              ]}>
+                {isFollowingCreator ? 'Following' : 'Follow'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Title Row with Favorite Button */}
         <View style={styles.titleRow}>
           <View style={styles.titleContainer}>
@@ -109,36 +165,20 @@ export default function LineupDetailScreen({ route }) {
           <Text style={styles.tag}>{lineup.nadeType}</Text>
         </View>
 
-        {/* Upvote and Comment Buttons */}
-        <View style={styles.actionButtonsContainer}>
-          <TouchableOpacity
-            style={[styles.upvoteButton, upvoted && styles.upvoteButtonActive]}
-            onPress={() => toggleUpvote(lineup.id)}
-          >
-            <Ionicons
-              name={upvoted ? 'heart' : 'heart-outline'}
-              size={24}
-              color={upvoted ? '#fff' : '#FF6800'}
-            />
-            <Text style={[styles.upvoteText, upvoted && styles.upvoteTextActive]}>
-              {upvoteCount}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.commentButton}
-            onPress={() => setCommentsVisible(true)}
-          >
-            <Ionicons
-              name="chatbubble-outline"
-              size={24}
-              color="#fff"
-            />
-            <Text style={styles.commentText}>
-              {commentCount}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* Upvote Button */}
+        <TouchableOpacity
+          style={[styles.upvoteButton, upvoted && styles.upvoteButtonActive]}
+          onPress={() => toggleUpvote(lineup.id)}
+        >
+          <Ionicons 
+            name={upvoted ? 'heart' : 'heart-outline'} 
+            size={24} 
+            color={upvoted ? '#fff' : '#FF6800'} 
+          />
+          <Text style={[styles.upvoteText, upvoted && styles.upvoteTextActive]}>
+            {upvoteCount} upvotes
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Throw Instructions */}
@@ -155,8 +195,6 @@ export default function LineupDetailScreen({ route }) {
             source={typeof lineup.standImage === 'string' ? { uri: lineup.standImage } : lineup.standImage}
             style={styles.image}
             contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={200}
             onLoadStart={() => setStandImageLoading(true)}
             onLoad={() => setStandImageLoading(false)}
           />
@@ -195,13 +233,11 @@ export default function LineupDetailScreen({ route }) {
           <Text style={styles.thirdPersonLabel}>Third-Person Perspective:</Text>
           <TouchableOpacity activeOpacity={0.9}>
             <Image
-              source={typeof lineup.standImageThirdPerson === 'string'
-                ? { uri: lineup.standImageThirdPerson }
+              source={typeof lineup.standImageThirdPerson === 'string' 
+                ? { uri: lineup.standImageThirdPerson } 
                 : lineup.standImageThirdPerson}
               style={styles.image}
               contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={200}
               onLoadStart={() => setThirdPersonLoading(true)}
               onLoad={() => setThirdPersonLoading(false)}
             />
@@ -222,8 +258,6 @@ export default function LineupDetailScreen({ route }) {
             source={typeof lineup.aimImage === 'string' ? { uri: lineup.aimImage } : lineup.aimImage}
             style={styles.image}
             contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={200}
             onLoadStart={() => setAimImageLoading(true)}
             onLoad={() => setAimImageLoading(false)}
           />
@@ -247,8 +281,6 @@ export default function LineupDetailScreen({ route }) {
             source={typeof lineup.landImage === 'string' ? { uri: lineup.landImage } : lineup.landImage}
             style={styles.image}
             contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={200}
             onLoadStart={() => setLandImageLoading(true)}
             onLoad={() => setLandImageLoading(false)}
           />
@@ -273,13 +305,6 @@ export default function LineupDetailScreen({ route }) {
         swipeToCloseEnabled={true}
         doubleTapToZoomEnabled={true}
       />
-
-      {/* Comments Modal */}
-      <CommentsModal
-        visible={commentsVisible}
-        onClose={() => setCommentsVisible(false)}
-        lineupId={lineup.id}
-      />
     </ScrollView>
   );
 }
@@ -293,6 +318,68 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#2a2a2a',
   },
+  // NEW: Creator row styles
+  creatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#3a3a3a',
+  },
+  creatorInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  creatorAvatarContainer: {
+    marginRight: 12,
+  },
+  creatorAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#3a3a3a',
+  },
+  creatorDetails: {
+    flex: 1,
+  },
+  creatorNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  creatorUsername: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+    marginRight: 4,
+  },
+  creatorFollowers: {
+    fontSize: 13,
+    color: '#888',
+  },
+  followButton: {
+    backgroundColor: '#FF6800',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  followingButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#4a4a4a',
+  },
+  followButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  followingButtonText: {
+    color: '#fff',
+  },
+  // Existing styles below...
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -329,12 +416,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
     marginBottom: 8,
   },
-  actionButtonsContainer: {
-    flexDirection: 'row',
-    gap: 10,
-  },
   upvoteButton: {
-    flex: 3,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -356,23 +438,6 @@ const styles = StyleSheet.create({
   },
   upvoteTextActive: {
     color: '#fff',
-  },
-  commentButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#3a3a3a',
-    padding: 15,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#4a4a4a',
-  },
-  commentText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginLeft: 10,
   },
   instructionBox: {
     backgroundColor: '#5E98D9',
@@ -440,6 +505,7 @@ const styles = StyleSheet.create({
   },
   thirdPersonContainer: {
     marginTop: 15,
+    padding: 15,
   },
   thirdPersonLabel: {
     fontSize: 16,
@@ -477,5 +543,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 10,
+  },
+  errorContainer: {
+    flex: 1,
+    backgroundColor: '#1a1a1a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#666',
+    marginTop: 15,
   },
 });
