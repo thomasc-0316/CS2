@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,11 +13,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useFollow } from '../context/FollowContext';
 import { useProfile } from '../context/ProfileContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function FollowersFollowingModal({ visible, onClose, initialTab = 'followers' }) {
   const navigation = useNavigation();
-  const { getFollowing, getFollowers, followUser, unfollowUser, isFollowing } = useFollow();
+  const { getFollowing, getFollowers, followUser, unfollowUser, isFollowing, refreshFollowers } = useFollow();
   const { profile } = useProfile();
+  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState(initialTab);
 
   const followers = getFollowers();
@@ -25,9 +27,15 @@ export default function FollowersFollowingModal({ visible, onClose, initialTab =
 
   const currentList = activeTab === 'followers' ? followers : following;
 
+  useEffect(() => {
+    if (visible) {
+      refreshFollowers();
+    }
+  }, [visible, refreshFollowers]);
+
   const handleFollowToggle = async (user) => {
-    if (isFollowing(user.id)) {
-      await unfollowUser(user.id);
+    if (isFollowing(user.id, user.playerID, user.username)) {
+      await unfollowUser(user.id, user.playerID, user.username);
     } else {
       await followUser(user.id, user.username, user.profilePicture, user.playerID);
     }
@@ -40,8 +48,10 @@ export default function FollowersFollowingModal({ visible, onClose, initialTab =
   };
 
   const renderUser = ({ item }) => {
-    const isCurrentUser = item.playerID && profile.playerID && item.playerID === profile.playerID;
-    const followingUser = isFollowing(item.id);
+    const isCurrentUser =
+      item.id === currentUser?.uid ||
+      (item.playerID && profile.playerID && item.playerID === profile.playerID);
+    const followingUser = isFollowing(item.id, item.playerID, item.username);
 
     return (
       <View style={styles.userContainer}>

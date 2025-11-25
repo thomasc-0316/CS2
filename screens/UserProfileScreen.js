@@ -64,8 +64,8 @@ export default function UserProfileScreen({ route }) {
   const navigation = useNavigation();
   const { userId } = route.params;
   const { getUpvoteCount } = useUpvotes();
-  const { isFollowing, followUser, unfollowUser, getUserFollowerCount } = useFollow();
-  const { getUserProfile } = useAuth();
+  const { isFollowing, followUser, unfollowUser } = useFollow();
+  const { getUserProfile, currentUser } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [user, setUser] = useState(null);
@@ -85,10 +85,14 @@ export default function UserProfileScreen({ route }) {
   useEffect(() => {
     loadUser();
   }, [userId]);
-  const isFollowingUser = user ? isFollowing(user.id) : false;
+  const isFollowingUser = user ? isFollowing(user.id, user.playerID, user.username) : false;
+  const isOwnProfile = currentUser?.uid === userId;
 
-  // Calculate dynamic follower count (base followers + current app followers)
-  const dynamicFollowerCount = user ? (user.followers || 0) + getUserFollowerCount(userId) : 0;
+  // Use server follower count when available; fall back to optimistic +1 if we follow and no count exists yet
+  const baseFollowerCount = user && typeof user.followers === 'number' ? user.followers : 0;
+  const dynamicFollowerCount = baseFollowerCount > 0
+    ? baseFollowerCount
+    : (isFollowingUser ? 1 : 0);
 
   // Get user's lineups
   const userLineups = LINEUPS.filter(lineup => lineup.creatorId === userId);
@@ -105,12 +109,13 @@ export default function UserProfileScreen({ route }) {
 
   const handleFollowToggle = async () => {
     if (!user) return;
+    if (isOwnProfile) return;
     if (followLoading) return;
     setFollowLoading(true);
 
     try {
       if (isFollowingUser) {
-        await unfollowUser(user.id);
+        await unfollowUser(user.id, user.playerID, user.username);
       } else {
         await followUser(user.id, user.username, user.profilePicture, user.playerID);
       }
@@ -182,21 +187,23 @@ export default function UserProfileScreen({ route }) {
           </View>
 
           {/* Follow Button (right side) */}
-          <TouchableOpacity
-            style={[
-              styles.followButton,
-              isFollowingUser && styles.followingButton
-            ]}
-            onPress={handleFollowToggle}
-            disabled={followLoading}
-          >
-            <Text style={[
-              styles.followButtonText,
-              isFollowingUser && styles.followingButtonText
-            ]}>
-              {isFollowingUser ? 'Following' : 'Follow'}
-            </Text>
-          </TouchableOpacity>
+          {!isOwnProfile && (
+            <TouchableOpacity
+              style={[
+                styles.followButton,
+                isFollowingUser && styles.followingButton
+              ]}
+              onPress={handleFollowToggle}
+              disabled={followLoading}
+            >
+              <Text style={[
+                styles.followButtonText,
+                isFollowingUser && styles.followingButtonText
+              ]}>
+                {isFollowingUser ? 'Following' : 'Follow'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
