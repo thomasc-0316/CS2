@@ -6,7 +6,6 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import {
   Timestamp,
   collection,
@@ -18,7 +17,8 @@ import {
   setDoc,
   updateDoc,
 } from 'firebase/firestore';
-import { auth, db } from '../firebaseConfig';
+import { db } from '../firebaseConfig';
+import { useAuth } from './AuthContext';
 
 const TacticsContext = createContext();
 
@@ -38,30 +38,35 @@ const DEFAULT_TACTIC_SOURCE = 'default';
 const getDefaultUsername = (uid) => `Player-${uid.slice(-4)}`;
 
 export const TacticsProvider = ({ children }) => {
+  const { currentUser } = useAuth();
   const [user, setUser] = useState(null);
   const [room, setRoom] = useState(null);
   const [roomCode, setRoomCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Sign in anonymously on mount
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        return;
-      }
-      try {
-        const credential = await signInAnonymously(auth);
-        setUser(credential.user);
-      } catch (err) {
-        console.error('Failed to sign in anonymously', err);
-        setError('Unable to authenticate user.');
-      }
-    });
+  const buildPlayer = (firebaseUser) => {
+    if (!firebaseUser) return null;
+    const profile = firebaseUser.profile || {};
+    const username =
+      profile.username ||
+      firebaseUser.displayName ||
+      getDefaultUsername(firebaseUser.uid);
+    const profilePicture =
+      profile.profilePicture || firebaseUser.photoURL || null;
 
-    return () => unsubscribe();
-  }, []);
+    return {
+      uid: firebaseUser.uid,
+      username,
+      avatar: profilePicture,
+      profilePicture,
+    };
+  };
+
+  // Mirror authenticated user from AuthContext; no anonymous login
+  useEffect(() => {
+    setUser(currentUser || null);
+  }, [currentUser]);
 
   // Listen to room changes
   useEffect(() => {
@@ -156,13 +161,7 @@ export const TacticsProvider = ({ children }) => {
         timerPaused: false,
         pausedRemainingMs: null,
         grenadeSelections: {},
-        players: [
-          {
-            uid: user.uid,
-            username: getDefaultUsername(user.uid),
-            avatar: user?.photoURL || null,
-          },
-        ],
+        players: [buildPlayer(user)],
         createdAt: Timestamp.now(),
       };
 
@@ -205,11 +204,7 @@ export const TacticsProvider = ({ children }) => {
           transaction.update(roomRef, {
             players: [
               ...players,
-              {
-                uid: user.uid,
-                username: getDefaultUsername(user.uid),
-                avatar: user?.photoURL || null,
-              },
+              buildPlayer(user),
             ],
           });
         });

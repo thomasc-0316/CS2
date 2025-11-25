@@ -10,10 +10,12 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useFollow } from '../context/FollowContext';
 import { useProfile } from '../context/ProfileContext';
 
 export default function FollowersFollowingModal({ visible, onClose, initialTab = 'followers' }) {
+  const navigation = useNavigation();
   const { getFollowing, getFollowers, followUser, unfollowUser, isFollowing } = useFollow();
   const { profile } = useProfile();
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -23,12 +25,18 @@ export default function FollowersFollowingModal({ visible, onClose, initialTab =
 
   const currentList = activeTab === 'followers' ? followers : following;
 
-  const handleFollowToggle = (user) => {
+  const handleFollowToggle = async (user) => {
     if (isFollowing(user.id)) {
-      unfollowUser(user.id);
+      await unfollowUser(user.id);
     } else {
-      followUser(user.id, user.username, user.profilePicture);
+      await followUser(user.id, user.username, user.profilePicture);
     }
+  };
+
+  const handleOpenProfile = (user) => {
+    if (!user?.id) return;
+    onClose?.();
+    navigation.navigate('UserProfile', { userId: user.id, username: user.username });
   };
 
   const renderUser = ({ item }) => {
@@ -37,7 +45,7 @@ export default function FollowersFollowingModal({ visible, onClose, initialTab =
 
     return (
       <View style={styles.userContainer}>
-        <View style={styles.userInfo}>
+        <TouchableOpacity style={styles.userInfo} onPress={() => handleOpenProfile(item)}>
           <View style={styles.avatarContainer}>
             {item.profilePicture && typeof item.profilePicture === 'string' && item.profilePicture.trim() !== '' ? (
               <Image
@@ -53,7 +61,7 @@ export default function FollowersFollowingModal({ visible, onClose, initialTab =
             <Text style={styles.username}>{item.username}</Text>
             {item.id && <Text style={styles.userId}>ID: {item.id}</Text>}
           </View>
-        </View>
+        </TouchableOpacity>
 
         {!isCurrentUser && (
           <TouchableOpacity
@@ -98,7 +106,7 @@ export default function FollowersFollowingModal({ visible, onClose, initialTab =
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+            <Ionicons name="arrow-back" size={18} color="#fff" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{profile.username}</Text>
           <View style={styles.placeholder} />

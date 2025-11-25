@@ -33,6 +33,7 @@ export default function LineupDetailScreen({ route, navigation }) {
   // Get creator info
   const creator = getUserById(lineup.creatorId);
   const isFollowingCreator = creator ? isFollowing(creator.id) : false;
+  const creatorFollowerCount = (creator?.followers || 0) + (isFollowingCreator ? 1 : 0);
 
   // Image viewing state
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
@@ -43,6 +44,7 @@ export default function LineupDetailScreen({ route, navigation }) {
   const [aimImageLoading, setAimImageLoading] = useState(true);
   const [landImageLoading, setLandImageLoading] = useState(true);
   const [thirdPersonLoading, setThirdPersonLoading] = useState(true);
+  const [followLoading, setFollowLoading] = useState(false);
   
   // Check if third person image exists
   const hasThirdPerson = !!lineup.standImageThirdPerson;
@@ -67,19 +69,24 @@ export default function LineupDetailScreen({ route, navigation }) {
     setImageViewerVisible(true);
   };
 
-  const handleFollowToggle = () => {
+  const handleFollowToggle = async () => {
     if (!creator) return;
-    
-    if (isFollowingCreator) {
-      unfollowUser(creator.id);
-    } else {
-      followUser(creator.id, creator.username, creator.profilePicture);
+    if (followLoading) return;
+    setFollowLoading(true);
+    try {
+      if (isFollowingCreator) {
+        await unfollowUser(creator.id);
+      } else {
+        await followUser(creator.id, creator.username, creator.profilePicture);
+      }
+    } finally {
+      setFollowLoading(false);
     }
   };
 
   const handleCreatorPress = () => {
     if (!creator) return;
-    navigation.navigate('CreatorProfile', { userId: creator.id });
+    navigation.navigate('UserProfile', { userId: creator.id, username: creator.username });
   };
 
   return (
@@ -112,7 +119,7 @@ export default function LineupDetailScreen({ route, navigation }) {
                   )}
                 </View>
                 <Text style={styles.creatorFollowers}>
-                  {creator.followers.toLocaleString()} followers
+                  {creatorFollowerCount.toLocaleString()} followers
                 </Text>
               </View>
             </TouchableOpacity>
@@ -123,6 +130,7 @@ export default function LineupDetailScreen({ route, navigation }) {
                 isFollowingCreator && styles.followingButton
               ]}
               onPress={handleFollowToggle}
+              disabled={followLoading}
             >
               <Text style={[
                 styles.followButtonText,

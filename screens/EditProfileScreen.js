@@ -14,9 +14,11 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useProfile } from '../context/ProfileContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function EditProfileScreen({ navigation }) {
   const { profile, updateProfile } = useProfile();
+  const { updateUserProfile } = useAuth();
   
   // Local state for editing
   const [username, setUsername] = useState(profile.username);
@@ -24,20 +26,38 @@ export default function EditProfileScreen({ navigation }) {
   const [pronouns, setPronouns] = useState(profile.pronouns);
   const [links, setLinks] = useState(profile.links);
   const [profilePicture, setProfilePicture] = useState(profile.profilePicture);
+  const [saving, setSaving] = useState(false);
 
   const handleCancel = () => {
     navigation.goBack();
   };
 
-  const handleDone = () => {
-    updateProfile({
+  const handleDone = async () => {
+    if (saving) return;
+    setSaving(true);
+
+    const updates = {
       username,
+      displayName: username,
       bio,
       pronouns,
       links,
       profilePicture,
-    });
-    navigation.goBack();
+    };
+
+    try {
+      await updateUserProfile(updates);
+      updateProfile({
+        ...profile,
+        ...updates,
+        playerID: profile.playerID,
+      });
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save profile changes.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const showImagePickerOptions = () => {
@@ -135,7 +155,7 @@ export default function EditProfileScreen({ navigation }) {
         <Text style={styles.headerTitle}>Edit Profile</Text>
         
         <TouchableOpacity onPress={handleDone}>
-          <Text style={styles.doneButton}>Done</Text>
+          <Text style={styles.doneButton}>{saving ? 'Saving...' : 'Done'}</Text>
         </TouchableOpacity>
       </View>
 

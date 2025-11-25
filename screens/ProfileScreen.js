@@ -8,6 +8,7 @@ import { useUpvotes } from '../context/UpvoteContext';
 import { useDrafts } from '../context/DraftsContext';
 import { useFollow } from '../context/FollowContext';
 import { useAuth } from '../context/AuthContext';  // ADD THIS
+import { useProfile } from '../context/ProfileContext';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';  // ADD THIS
 import { db } from '../firebaseConfig';  // ADD THIS
 import { LINEUPS } from '../data/lineups';
@@ -120,7 +121,8 @@ export default function ProfileScreen() {
   const { getUpvoteCount } = useUpvotes();
   const { drafts, deleteDraft } = useDrafts();
   const { getFollowingCount, getFollowersCount } = useFollow();
-  const { currentUser, logout } = useAuth();  // ADD THIS - Get current user and logout
+  const { currentUser, logout, updateUserProfile } = useAuth();  // ADD THIS - Get current user and logout
+  const { profile: storedProfile, updateProfile: updateLocalProfile } = useProfile();
   
   const [activeTab, setActiveTab] = useState('favorites');
   const [followModalVisible, setFollowModalVisible] = useState(false);
@@ -129,16 +131,35 @@ export default function ProfileScreen() {
   const [myLineups, setMyLineups] = useState([]);  // ADD THIS - State for user's lineups
   const [loading, setLoading] = useState(false);  // ADD THIS
 
-  // Get user profile from Firebase Auth
-  const profile = currentUser?.profile || {
-    username: currentUser?.email?.split('@')[0] || 'User',
-    playerID: currentUser?.uid?.substring(0, 9).toUpperCase() || 'N/A',
+  // Get user profile prioritizing locally edited profile, with Firebase as fallback
+  const profileFromAuth = currentUser?.profile || {};
+  const profileFromLocal = storedProfile || {};
+  const fallbackPlayerIdSource =
+    profileFromLocal.playerID
+    || profileFromAuth.id
+    || profileFromAuth.playerID
+    || currentUser?.uid
+    || '';
+  const profile = {
     bio: '',
     profilePicture: null,
     followers: 0,
     following: 0,
-    totalLineups: 0
+    totalLineups: 0,
+    ...profileFromAuth,
+    ...profileFromLocal,
+    username:
+      profileFromLocal.username
+      || profileFromAuth.username
+      || currentUser?.email?.split('@')[0]
+      || 'User',
+    playerID:
+      profileFromLocal.playerID
+      || profileFromAuth.playerID
+      || (fallbackPlayerIdSource ? fallbackPlayerIdSource.substring(0, 9).toUpperCase() : 'N/A'),
   };
+  const followerCount = getFollowersCount() || profile.followers || 0;
+  const followingCount = getFollowingCount() || profile.following || 0;
 
   const favoriteIds = getFavorites();
   const favoriteLineups = LINEUPS.filter(lineup => favoriteIds.includes(lineup.id));
@@ -226,8 +247,13 @@ export default function ProfileScreen() {
           {
             text: 'Save',
             onPress: async (text) => {
-              // TODO: Update bio in Firestore
-              console.log('Update bio to:', text);
+              try {
+                const trimmed = (text || '').trim();
+                await updateUserProfile({ bio: trimmed });
+                updateLocalProfile({ ...profile, bio: trimmed });
+              } catch (error) {
+                Alert.alert('Error', 'Failed to update bio');
+              }
             },
           },
         ],
@@ -235,7 +261,7 @@ export default function ProfileScreen() {
         profile.bio
       );
     } else {
-      // For Android, navigate to edit profile
+      // Android: take user to full edit screen
       navigation.navigate('EditProfile');
     }
   };
@@ -310,12 +336,12 @@ export default function ProfileScreen() {
           {/* Stats (left side, compact) */}
           <View style={styles.statsContainer}>
             <TouchableOpacity style={styles.statItem} onPress={openFollowersModal}>
-              <Text style={styles.statNumber}>{profile.followers || 0}</Text>
+              <Text style={styles.statNumber}>{followerCount}</Text>
               <Text style={styles.statLabel}>Followers</Text>
             </TouchableOpacity>
             <View style={styles.statDivider} />
             <TouchableOpacity style={styles.statItem} onPress={openFollowingModal}>
-              <Text style={styles.statNumber}>{profile.following || 0}</Text>
+              <Text style={styles.statNumber}>{followingCount}</Text>
               <Text style={styles.statLabel}>Following</Text>
             </TouchableOpacity>
             <View style={styles.statDivider} />

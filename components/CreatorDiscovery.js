@@ -12,7 +12,7 @@ export default function LineupCard({ lineup, navigation }) {
 
   const handleCreatorPress = () => {
     if (!creator) return;
-    navigation.navigate('CreatorProfile', { userId: creator.id });
+    navigation.navigate('UserProfile', { userId: creator.id, username: creator.username });
   };
 
   return (
