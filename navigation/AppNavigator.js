@@ -206,75 +206,73 @@ function ProfileStack() {
 
 export default function AppNavigator() {
   return (
-    <NavigationContainer>
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ focused, color, size }) => {
-            let iconName;
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
 
-            if (route.name === 'Home') {
-              iconName = focused ? 'home' : 'home-outline';
-            } else if (route.name === 'Hot') {
-              iconName = focused ? 'flame' : 'flame-outline';
-            } else if (route.name === 'Post') {
-              return (
-                <View style={styles.postButton}>
-                  <Ionicons name="add" size={28} color="#fff" />
-                </View>
-              );
-            } else if (route.name === 'Tactics') {
-              iconName = focused ? 'book' : 'book-outline';
-            } else if (route.name === 'Profile') {
-              iconName = focused ? 'person-circle' : 'person-circle-outline';
-            }
+          if (route.name === 'Home') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Hot') {
+            iconName = focused ? 'flame' : 'flame-outline';
+          } else if (route.name === 'Post') {
+            return (
+              <View style={styles.postButton}>
+                <Ionicons name="add" size={28} color="#fff" />
+              </View>
+            );
+          } else if (route.name === 'Tactics') {
+            iconName = focused ? 'book' : 'book-outline';
+          } else if (route.name === 'Profile') {
+            iconName = focused ? 'person-circle' : 'person-circle-outline';
+          }
 
-            return <Ionicons name={iconName} size={24} color={color} />;
-          },
-          tabBarActiveTintColor: '#fff',
-          tabBarInactiveTintColor: '#666',
-          tabBarStyle: {
-            backgroundColor: '#0a0a0a',
-            borderTopColor: '#1a1a1a',
-            height: 80,
-            paddingBottom: 20,
-            paddingTop: 10,
-          },
-          tabBarLabelStyle: {
-            fontSize: 11,
-            marginTop: 4,
-          },
-        })}
-      >
-        <Tab.Screen 
-          name="Home" 
-          component={HomeStack}
-          options={{ headerShown: false }}
-        />
-        <Tab.Screen 
-          name="Hot" 
-          component={HotStack}
-          options={{ headerShown: false }}
-        />
-        <Tab.Screen 
-          name="Post" 
-          component={PostStack}
-          options={{ 
-            headerShown: false,
-            tabBarLabel: '',
-          }}
-        />
-        <Tab.Screen 
-          name="Tactics" 
-          component={TacticsScreen}
-          options={{ headerShown: false }}
-        />
-        <Tab.Screen 
-          name="Profile" 
-          component={ProfileStack}
-          options={{ headerShown: false }}
-        />
-      </Tab.Navigator>
-    </NavigationContainer>
+          return <Ionicons name={iconName} size={24} color={color} />;
+        },
+        tabBarActiveTintColor: '#fff',
+        tabBarInactiveTintColor: '#666',
+        tabBarStyle: {
+          backgroundColor: '#0a0a0a',
+          borderTopColor: '#1a1a1a',
+          height: 80,
+          paddingBottom: 20,
+          paddingTop: 10,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          marginTop: 4,
+        },
+      })}
+    >
+      <Tab.Screen 
+        name="Home" 
+        component={HomeStack}
+        options={{ headerShown: false }}
+      />
+      <Tab.Screen 
+        name="Hot" 
+        component={HotStack}
+        options={{ headerShown: false }}
+      />
+      <Tab.Screen 
+        name="Post" 
+        component={PostStack}
+        options={{ 
+          headerShown: false,
+          tabBarLabel: '',
+        }}
+      />
+      <Tab.Screen 
+        name="Tactics" 
+        component={TacticsScreen}
+        options={{ headerShown: false }}
+      />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileStack}
+        options={{ headerShown: false }}
+      />
+    </Tab.Navigator>
   );
 }
 
