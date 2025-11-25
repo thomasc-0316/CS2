@@ -17,8 +17,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import SearchLineupsScreen from '../screens/SearchLineupsScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
-import CreatorProfileScreen from '../screens/CreatorProfileScreen'; // NEW
-import { getUserById } from '../data/users'; // NEW
+// Creator profiles now use the unified UserProfileScreen
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -61,13 +60,6 @@ function HomeStack() {
           title: route.params?.username || 'User Profile'
         })}
       />
-      <Stack.Screen
-        name="CreatorProfile"
-        component={CreatorProfileScreen}
-        options={({ route }) => ({
-          title: getUserById(route.params?.userId)?.username || 'Creator Profile'
-        })}
-      />
     </Stack.Navigator>
   );
 }
@@ -101,13 +93,6 @@ function HotStack() {
         component={UserProfileScreen}
         options={({ route }) => ({
           title: route.params?.username || 'User Profile'
-        })}
-      />
-      <Stack.Screen
-        name="CreatorProfile"
-        component={CreatorProfileScreen}
-        options={({ route }) => ({
-          title: getUserById(route.params?.userId)?.username || 'Creator Profile'
         })}
       />
     </Stack.Navigator>
@@ -191,13 +176,6 @@ function ProfileStack() {
         component={UserProfileScreen}
         options={({ route }) => ({
           title: route.params?.username || 'User Profile'
-        })}
-      />
-      <Stack.Screen
-        name="CreatorProfile"
-        component={CreatorProfileScreen}
-        options={({ route }) => ({
-          title: getUserById(route.params?.userId)?.username || 'Creator Profile'
         })}
       />
     </Stack.Navigator>
