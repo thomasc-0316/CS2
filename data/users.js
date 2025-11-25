@@ -3,6 +3,8 @@ export const USERS = [
   {
     id: 'user_official',
     username: 'Textbook',
+    usernameLower: 'textbook',
+    playerID: '00000002',
     bio: 'Official CS Lineups account | Textbook lineups for competitive play',
     pronouns: '',
     profilePicture: null,
@@ -13,6 +15,8 @@ export const USERS = [
   {
     id: 'user_001',
     username: 'ProNader',
+    usernameLower: 'pronader',
+    playerID: '00000011',
     bio: 'Professional CS2 player | Lineup specialist',
     pronouns: 'he/him',
     profilePicture: null,
@@ -23,6 +27,8 @@ export const USERS = [
   {
     id: 'user_002',
     username: 'SmokeQueen',
+    usernameLower: 'smokequeen',
+    playerID: '00000012',
     bio: 'Teaching smokes since 2015 🔥',
     pronouns: 'she/her',
     profilePicture: null,
@@ -33,6 +39,8 @@ export const USERS = [
   {
     id: 'user_003',
     username: 'FlashMaster',
+    usernameLower: 'flashmaster',
+    playerID: '00000013',
     bio: 'Flash lineups for every map | Team Liquid',
     pronouns: 'he/him',
     profilePicture: null,
@@ -43,6 +51,8 @@ export const USERS = [
   {
     id: 'user_004',
     username: 'TacticianPro',
+    usernameLower: 'tacticianpro',
+    playerID: '00000014',
     bio: 'IGLing since forever | Share my strats',
     pronouns: 'they/them',
     profilePicture: null,
@@ -53,6 +63,8 @@ export const USERS = [
   {
     id: 'user_005',
     username: 'MollyGod',
+    usernameLower: 'mollygod',
+    playerID: '00000015',
     bio: 'Molotov specialist | Burning sites since 2018',
     pronouns: 'he/him',
     profilePicture: null,
@@ -63,6 +75,8 @@ export const USERS = [
   {
     id: 'user_006',
     username: 'NadeExpert',
+    usernameLower: 'nadeexpert',
+    playerID: '00000016',
     bio: 'All nades, all maps | Check my lineups',
     pronouns: 'she/her',
     profilePicture: null,
@@ -73,6 +87,8 @@ export const USERS = [
   {
     id: 'user_007',
     username: 'UtilityKing',
+    usernameLower: 'utilityking',
+    playerID: '00000017',
     bio: 'Utility usage coach | FaZe Clan',
     pronouns: 'he/him',
     profilePicture: null,
@@ -83,6 +99,8 @@ export const USERS = [
   {
     id: 'user_008',
     username: 'CasualPlayer',
+    usernameLower: 'casualplayer',
+    playerID: '00000018',
     bio: 'Just sharing what I know',
     pronouns: '',
     profilePicture: null,

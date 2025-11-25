@@ -1,9 +1,10 @@
-import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
+import React, { createContext, useState, useEffect, useContext, useRef, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   increment,
   onSnapshot,
   serverTimestamp,
@@ -173,7 +174,9 @@ export const FollowProvider = ({ children }) => {
   };
 
   const followUser = async (userId, username, profilePicture, playerID) => {
-    if (!userId || !currentUser || userId === currentUser.uid || isFollowing(userId)) return;
+    if (!userId || !currentUser || userId === currentUser.uid) return;
+    const existingKey = findFollowingKey(userId, playerID, username);
+    if (existingKey) return;
     setFollowing(prev => {
       if (prev[userId]) return prev;
       const newFollowing = {
@@ -188,22 +191,42 @@ export const FollowProvider = ({ children }) => {
     await bumpRemoteCounts(userId, 1);
   };
 
-  const unfollowUser = async (userId) => {
-    if (!userId || !currentUser || !isFollowing(userId)) return;
+  const unfollowUser = async (userId, playerID, username) => {
+    if (!userId || !currentUser) return;
+    const targetKey = findFollowingKey(userId, playerID, username);
+    if (!targetKey) return;
     setFollowing(prev => {
-      if (!prev[userId]) return prev;
+      if (!prev[targetKey]) return prev;
       const newFollowing = { ...prev };
-      delete newFollowing[userId];
+      delete newFollowing[targetKey];
       saveFollowing(newFollowing);
       return newFollowing;
     });
 
-    await removeFollowerRecord(userId);
-    await bumpRemoteCounts(userId, -1);
+    await removeFollowerRecord(targetKey);
+    await bumpRemoteCounts(targetKey, -1);
   };
 
-  const isFollowing = (userId) => {
-    return !!following[userId];
+  const isFollowing = (userId, playerID, username) => {
+    return findFollowingKey(userId, playerID, username) !== null;
+  };
+
+  const findFollowingKey = (userId, playerID, username) => {
+    if (following[userId]) return userId;
+    if (playerID) {
+      const matchId = Object.keys(following).find(
+        (id) => following[id]?.playerID && following[id].playerID === playerID
+      );
+      if (matchId) return matchId;
+    }
+    if (username) {
+      const lower = username.toLowerCase();
+      const matchId = Object.keys(following).find(
+        (id) => (following[id]?.username || '').toLowerCase() === lower
+      );
+      if (matchId) return matchId;
+    }
+    return null;
   };
 
   const getFollowing = () => {
@@ -230,9 +253,32 @@ export const FollowProvider = ({ children }) => {
 
   // Get follower count for a specific user (how many people follow them)
   const getUserFollowerCount = (userId) => {
-    // Check if the current user is following this user
-    return isFollowing(userId) ? 1 : 0;
+    // Counts are tracked on user documents; return 0 to avoid local double-counting overlays.
+    return 0;
   };
+
+  const refreshFollowers = useCallback(async () => {
+    if (!currentUser?.uid) {
+      setFollowers({});
+      return;
+    }
+    try {
+      const snapshot = await getDocs(collection(db, 'users', currentUser.uid, 'followers'));
+      const nextFollowers = {};
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        nextFollowers[docSnap.id] = {
+          username: data.username || 'Player',
+          profilePicture: data.profilePicture || null,
+          playerID: data.playerID || null,
+        };
+      });
+      setFollowers(nextFollowers);
+      saveFollowers(nextFollowers);
+    } catch (error) {
+      console.error('Failed to refresh followers', error);
+    }
+  }, [currentUser?.uid]);
 
   return (
     <FollowContext.Provider value={{
@@ -244,6 +290,7 @@ export const FollowProvider = ({ children }) => {
       getFollowingCount,
       getFollowersCount,
       getUserFollowerCount,
+      refreshFollowers,
     }}>
       {children}
     </FollowContext.Provider>

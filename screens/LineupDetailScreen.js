@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { Asset } from 'expo-asset';
@@ -9,6 +9,9 @@ import { useFavorites } from '../context/FavoritesContext';
 import { useFollow } from '../context/FollowContext';
 import { getUserById } from '../data/users';
 import { LINEUPS } from '../data/lineups';
+import { useAuth } from '../context/AuthContext';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 
 export default function LineupDetailScreen({ route, navigation }) {
   const { lineupId } = route.params;
@@ -16,6 +19,7 @@ export default function LineupDetailScreen({ route, navigation }) {
   const { toggleUpvote, isUpvoted, getUpvoteCount } = useUpvotes();
   const { toggleFavorite, isFavorite } = useFavorites();
   const { isFollowing, followUser, unfollowUser } = useFollow();
+  const { getUserProfile, currentUser } = useAuth();
 
   if (!lineup) {
     return (
@@ -30,10 +34,82 @@ export default function LineupDetailScreen({ route, navigation }) {
   const upvoteCount = getUpvoteCount(lineup);
   const favorited = isFavorite(lineup.id);
 
-  // Get creator info
-  const creator = getUserById(lineup.creatorId);
-  const isFollowingCreator = creator ? isFollowing(creator.id) : false;
-  const creatorFollowerCount = (creator?.followers || 0) + (isFollowingCreator ? 1 : 0);
+  // Get creator info (live from Firestore, fallback to static seed data)
+  const staticCreator = getUserById(lineup.creatorId);
+  const [creatorProfile, setCreatorProfile] = useState(staticCreator || null);
+  const [creatorSource, setCreatorSource] = useState(staticCreator ? 'static' : 'unknown');
+  const lookupByUsername = useCallback(async (username) => {
+    if (!username) return null;
+    try {
+      const lower = username.toLowerCase();
+      const q = query(
+        collection(db, 'users'),
+        where('usernameLower', '==', lower),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const docSnap = snap.docs[0];
+        return { id: docSnap.id, ...docSnap.data() };
+      }
+    } catch (error) {
+      console.error('Failed to lookup creator by username', error);
+    }
+    return null;
+  }, []);
+  const lookupByPlayerId = useCallback(async (playerID) => {
+    if (!playerID) return null;
+    try {
+      const q = query(
+        collection(db, 'users'),
+        where('playerID', '==', playerID),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const docSnap = snap.docs[0];
+        return { id: docSnap.id, ...docSnap.data() };
+      }
+    } catch (error) {
+      console.error('Failed to lookup creator by playerID', error);
+    }
+    return null;
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadCreator = async () => {
+      try {
+        const liveProfile = await getUserProfile(lineup.creatorId);
+        const resolvedProfile =
+          liveProfile ||
+          (await lookupByPlayerId(staticCreator?.playerID)) ||
+          (await lookupByUsername(lineup.creatorUsername));
+        if (isMounted && resolvedProfile) {
+          setCreatorProfile(resolvedProfile);
+          setCreatorSource('live');
+        } else if (isMounted) {
+          setCreatorProfile(staticCreator || null);
+          setCreatorSource('static');
+        }
+      } catch (error) {
+        console.error('Failed to load creator profile', error);
+      }
+    };
+    loadCreator();
+    return () => {
+      isMounted = false;
+    };
+  }, [lineup.creatorId, lineup.creatorUsername, getUserProfile, lookupByUsername, lookupByPlayerId, staticCreator]);
+
+  const creator = creatorProfile || staticCreator;
+  const isFollowingCreator = creator ? isFollowing(creator.id, creator.playerID, creator.username) : false;
+  const isOwnProfile = currentUser?.uid && creator?.id === currentUser.uid;
+  const baseFollowerCount =
+    creatorSource === 'live' && creator && typeof creator.followers === 'number'
+      ? creator.followers
+      : 0;
+  const creatorFollowerCount = baseFollowerCount > 0 ? baseFollowerCount : (isFollowingCreator ? 1 : 0);
 
   // Image viewing state
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
@@ -45,6 +121,27 @@ export default function LineupDetailScreen({ route, navigation }) {
   const [landImageLoading, setLandImageLoading] = useState(true);
   const [thirdPersonLoading, setThirdPersonLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
+  const refreshCreator = async () => {
+    try {
+      const updated = await getUserProfile(lineup.creatorId);
+      if (updated) {
+        setCreatorProfile(updated);
+        setCreatorSource('live');
+        return;
+      }
+      const fallback =
+        (await lookupByPlayerId(staticCreator?.playerID)) ||
+        (await lookupByUsername(lineup.creatorUsername));
+      if (fallback) {
+        setCreatorProfile(fallback);
+        setCreatorSource('live');
+        return;
+      }
+      setCreatorSource(staticCreator ? 'static' : 'unknown');
+    } catch (error) {
+      console.error('Failed to refresh creator profile', error);
+    }
+  };
   
   // Check if third person image exists
   const hasThirdPerson = !!lineup.standImageThirdPerson;
@@ -71,14 +168,16 @@ export default function LineupDetailScreen({ route, navigation }) {
 
   const handleFollowToggle = async () => {
     if (!creator) return;
+    if (isOwnProfile) return;
     if (followLoading) return;
     setFollowLoading(true);
     try {
       if (isFollowingCreator) {
-        await unfollowUser(creator.id);
+        await unfollowUser(creator.id, creator.playerID, creator.username);
       } else {
         await followUser(creator.id, creator.username, creator.profilePicture, creator.playerID);
       }
+      await refreshCreator();
     } finally {
       setFollowLoading(false);
     }
@@ -124,21 +223,23 @@ export default function LineupDetailScreen({ route, navigation }) {
               </View>
             </TouchableOpacity>
             
-            <TouchableOpacity
-              style={[
-                styles.followButton,
-                isFollowingCreator && styles.followingButton
-              ]}
-              onPress={handleFollowToggle}
-              disabled={followLoading}
-            >
-              <Text style={[
-                styles.followButtonText,
-                isFollowingCreator && styles.followingButtonText
-              ]}>
-                {isFollowingCreator ? 'Following' : 'Follow'}
-              </Text>
-            </TouchableOpacity>
+            {!isOwnProfile && (
+              <TouchableOpacity
+                style={[
+                  styles.followButton,
+                  isFollowingCreator && styles.followingButton
+                ]}
+                onPress={handleFollowToggle}
+                disabled={followLoading}
+              >
+                <Text style={[
+                  styles.followButtonText,
+                  isFollowingCreator && styles.followingButtonText
+                ]}>
+                  {isFollowingCreator ? 'Following' : 'Follow'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
