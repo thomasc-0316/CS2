@@ -1,6 +1,15 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, increment, updateDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  collection,
+  deleteDoc,
+  doc,
+  increment,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { useAuth } from './AuthContext';
 
@@ -11,16 +20,38 @@ export const FollowProvider = ({ children }) => {
   // Structure: { userId: { username, profilePicture, playerID } }
   const [following, setFollowing] = useState({});
   const [followers, setFollowers] = useState({});
+  const followersUnsubscribeRef = useRef(null);
 
-  // Load data from storage on app start
+  const storageKey = (base) => {
+    return currentUser?.uid ? `${base}_${currentUser.uid}` : base;
+  };
+
+  // Load data from storage when auth user changes
   useEffect(() => {
     loadFollowData();
-  }, []);
+    startFollowersListener();
+    return () => {
+      if (followersUnsubscribeRef.current) {
+        followersUnsubscribeRef.current();
+        followersUnsubscribeRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.uid]);
 
   const loadFollowData = async () => {
     try {
-      const savedFollowing = await AsyncStorage.getItem('following');
-      const savedFollowers = await AsyncStorage.getItem('followers');
+      if (!currentUser?.uid) {
+        setFollowing({});
+        setFollowers({});
+        return;
+      }
+      const savedFollowing =
+        (await AsyncStorage.getItem(storageKey('following'))) ||
+        (await AsyncStorage.getItem('following')); // legacy key
+      const savedFollowers =
+        (await AsyncStorage.getItem(storageKey('followers'))) ||
+        (await AsyncStorage.getItem('followers')); // legacy key
 
       if (savedFollowing) {
         setFollowing(JSON.parse(savedFollowing));
@@ -35,7 +66,7 @@ export const FollowProvider = ({ children }) => {
 
   const saveFollowing = async (newFollowing) => {
     try {
-      await AsyncStorage.setItem('following', JSON.stringify(newFollowing));
+      await AsyncStorage.setItem(storageKey('following'), JSON.stringify(newFollowing));
     } catch (error) {
       console.error('Failed to save following:', error);
     }
@@ -43,10 +74,44 @@ export const FollowProvider = ({ children }) => {
 
   const saveFollowers = async (newFollowers) => {
     try {
-      await AsyncStorage.setItem('followers', JSON.stringify(newFollowers));
+      await AsyncStorage.setItem(storageKey('followers'), JSON.stringify(newFollowers));
     } catch (error) {
       console.error('Failed to save followers:', error);
     }
+  };
+
+  // Keep current user's followers list in sync with Firestore
+  const startFollowersListener = () => {
+    if (!currentUser?.uid) {
+      setFollowers({});
+      return;
+    }
+
+    if (followersUnsubscribeRef.current) {
+      followersUnsubscribeRef.current();
+      followersUnsubscribeRef.current = null;
+    }
+
+    const followersRef = collection(db, 'users', currentUser.uid, 'followers');
+    followersUnsubscribeRef.current = onSnapshot(
+      followersRef,
+      (snapshot) => {
+        const nextFollowers = {};
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() || {};
+          nextFollowers[docSnap.id] = {
+            username: data.username || 'Player',
+            profilePicture: data.profilePicture || null,
+            playerID: data.playerID || null,
+          };
+        });
+        setFollowers(nextFollowers);
+        saveFollowers(nextFollowers);
+      },
+      (error) => {
+        console.error('Failed to listen to followers', error);
+      }
+    );
   };
 
   const bumpRemoteCounts = async (targetUserId, delta) => {
@@ -72,6 +137,41 @@ export const FollowProvider = ({ children }) => {
     }
   };
 
+  const upsertFollowerRecord = async (targetUserId) => {
+    if (!currentUser?.uid) return;
+    try {
+      const followerProfile = currentUser.profile || {};
+      const followerData = {
+        id: currentUser.uid,
+        username:
+          followerProfile.username ||
+          currentUser.displayName ||
+          currentUser.email ||
+          'Player',
+        profilePicture:
+          followerProfile.profilePicture ||
+          currentUser.photoURL ||
+          null,
+        playerID: followerProfile.playerID || null,
+        createdAt: serverTimestamp(),
+      };
+      const followerDoc = doc(db, 'users', targetUserId, 'followers', currentUser.uid);
+      await setDoc(followerDoc, followerData, { merge: true });
+    } catch (error) {
+      console.error('Failed to upsert follower record', error);
+    }
+  };
+
+  const removeFollowerRecord = async (targetUserId) => {
+    if (!currentUser?.uid) return;
+    try {
+      const followerDoc = doc(db, 'users', targetUserId, 'followers', currentUser.uid);
+      await deleteDoc(followerDoc);
+    } catch (error) {
+      console.error('Failed to remove follower record', error);
+    }
+  };
+
   const followUser = async (userId, username, profilePicture, playerID) => {
     if (!userId || !currentUser || userId === currentUser.uid || isFollowing(userId)) return;
     setFollowing(prev => {
@@ -84,6 +184,7 @@ export const FollowProvider = ({ children }) => {
       return newFollowing;
     });
 
+    await upsertFollowerRecord(userId);
     await bumpRemoteCounts(userId, 1);
   };
 
@@ -97,6 +198,7 @@ export const FollowProvider = ({ children }) => {
       return newFollowing;
     });
 
+    await removeFollowerRecord(userId);
     await bumpRemoteCounts(userId, -1);
   };
 
