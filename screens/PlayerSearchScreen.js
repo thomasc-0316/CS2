@@ -65,7 +65,12 @@ export default function PlayerSearchScreen({ navigation }) {
       const pushDoc = (docSnap) => {
         if (seen.has(docSnap.id)) return;
         seen.add(docSnap.id);
-        merged.push({ id: docSnap.id, ...docSnap.data() });
+        const data = docSnap.data() || {};
+        merged.push({
+          id: docSnap.id,
+          ...data,
+          profilePicture: data.profilePicture || data.photoURL || null,
+        });
       };
 
       byIdSnap.forEach(pushDoc);
@@ -88,10 +93,11 @@ export default function PlayerSearchScreen({ navigation }) {
 
   const goToProfile = (user) => {
     if (!user) return;
+    const avatar = user.profilePicture || user.photoURL || null;
     navigation.navigate('UserProfile', {
       userId: user.id,
       username: user.username,
-      profilePicture: user.profilePicture,
+      profilePicture: avatar,
     });
   };
 
@@ -101,11 +107,11 @@ export default function PlayerSearchScreen({ navigation }) {
         <Text style={styles.title}>Find by Player ID</Text>
         <TextInput
           style={styles.input}
-        value={playerIdInput}
-        onChangeText={(text) => {
-          setPlayerIdInput(text);
-          setError('');
-        }}
+          value={playerIdInput}
+          onChangeText={(text) => {
+            setPlayerIdInput(text);
+            setError('');
+          }}
           placeholder="Enter Player ID or username"
           placeholderTextColor="#666"
           autoCapitalize="none"
@@ -126,27 +132,30 @@ export default function PlayerSearchScreen({ navigation }) {
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </View>
 
-      {results.map((user) => (
-        <TouchableOpacity key={user.id} style={styles.resultCard} onPress={() => goToProfile(user)}>
-          <View style={styles.avatar}>
-            {user.profilePicture ? (
-              <Image
-                source={{ uri: user.profilePicture }}
-                style={styles.avatarImage}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-              />
-            ) : (
-              <Ionicons name="person-circle" size={56} color="#FF6800" />
-            )}
-          </View>
-          <View style={styles.resultInfo}>
-            <Text style={styles.username}>{user.username || 'Unknown'}</Text>
-            <Text style={styles.playerId}>Player ID: {user.playerID || 'N/A'}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#fff" />
-        </TouchableOpacity>
-      ))}
+      {results.map((user) => {
+        const avatar = user.profilePicture || user.photoURL || null;
+        return (
+          <TouchableOpacity key={user.id} style={styles.resultCard} onPress={() => goToProfile(user)}>
+            <View style={styles.avatar}>
+              {avatar ? (
+                <Image
+                  source={{ uri: avatar }}
+                  style={styles.avatarImage}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                />
+              ) : (
+                <Ionicons name="person-circle" size={56} color="#FF6800" />
+              )}
+            </View>
+            <View style={styles.resultInfo}>
+              <Text style={styles.username}>{user.username || 'Unknown'}</Text>
+              <Text style={styles.playerId}>Player ID: {user.playerID || 'N/A'}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#fff" />
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }

@@ -15,10 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useProfile } from '../context/ProfileContext';
 import { useAuth } from '../context/AuthContext';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { storage } from '../firebaseConfig';
 
 export default function EditProfileScreen({ navigation }) {
   const { profile, updateProfile } = useProfile();
-  const { updateUserProfile } = useAuth();
+  const { updateUserProfile, currentUser } = useAuth();
   
   // Local state for editing
   const [username, setUsername] = useState(profile.username);
@@ -36,13 +38,37 @@ export default function EditProfileScreen({ navigation }) {
     if (saving) return;
     setSaving(true);
 
+    const uploadProfilePicture = async () => {
+      if (!profilePicture || profilePicture.startsWith('http')) {
+        return profilePicture || null;
+      }
+      if (!currentUser?.uid) return null;
+
+      try {
+        const response = await fetch(profilePicture);
+        const blob = await response.blob();
+        const fileRef = ref(storage, `profilePictures/${currentUser.uid}-${Date.now()}.jpg`);
+        await uploadBytes(fileRef, blob);
+        blob.close?.();
+        return await getDownloadURL(fileRef);
+      } catch (error) {
+        console.error('Failed to upload profile picture', error);
+        return null;
+      }
+    };
+
+    const uploadedProfileUrl = await uploadProfilePicture();
+    const removingPicture = profilePicture === null;
+
     const updates = {
       username,
       displayName: username,
       bio,
       pronouns,
       links,
-      profilePicture,
+      profilePicture: removingPicture
+        ? null
+        : uploadedProfileUrl || profile.profilePicture || null,
     };
 
     try {
