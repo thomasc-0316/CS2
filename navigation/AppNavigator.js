@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -17,24 +17,42 @@ import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import SearchLineupsScreen from '../screens/SearchLineupsScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
+import PlayerSearchScreen from '../screens/PlayerSearchScreen';
 // Creator profiles now use the unified UserProfileScreen
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
+const renderBackArrow = (navigation, canGoBack) => {
+  if (!canGoBack) return null;
+  return (
+    <TouchableOpacity onPress={() => navigation.goBack()} style={{ paddingHorizontal: 8 }}>
+      <Ionicons
+        name="arrow-back"
+        size={22}
+        color="#FF6800"
+      />
+    </TouchableOpacity>
+  );
+};
+
+const commonStackOptions = ({ navigation, route }) => ({
+  headerStyle: {
+    backgroundColor: '#0a0a0a',
+  },
+  headerTintColor: '#FF6800',
+  headerTitleStyle: {
+    fontWeight: 'bold',
+  },
+  headerBackTitleVisible: false,
+  headerLeft: ({ canGoBack }) => renderBackArrow(navigation, canGoBack),
+});
+
 // Home Stack
 function HomeStack() {
   return (
     <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#0a0a0a',
-        },
-        headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-      }}
+      screenOptions={commonStackOptions}
     >
       <Stack.Screen
         name="HomeMain"
@@ -60,6 +78,11 @@ function HomeStack() {
           title: route.params?.username || 'User Profile'
         })}
       />
+      <Stack.Screen
+        name="PlayerSearch"
+        component={PlayerSearchScreen}
+        options={{ title: 'Find Player' }}
+      />
     </Stack.Navigator>
   );
 }
@@ -68,15 +91,7 @@ function HomeStack() {
 function HotStack() {
   return (
     <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#0a0a0a',
-        },
-        headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-      }}
+      screenOptions={commonStackOptions}
     >
       <Stack.Screen
         name="HotMain"
@@ -103,15 +118,7 @@ function HotStack() {
 function PostStack() {
   return (
     <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#0a0a0a',
-        },
-        headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-      }}
+      screenOptions={commonStackOptions}
     >
       <Stack.Screen 
         name="PostMain" 
@@ -141,15 +148,7 @@ function PostStack() {
 function ProfileStack() {
   return (
     <Stack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: '#0a0a0a',
-        },
-        headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-      }}
+      screenOptions={commonStackOptions}
     >
       <Stack.Screen
         name="ProfileMain"

@@ -17,6 +17,8 @@ const generatePlayerID = () => {
   return `${timestamp}${random}`;
 };
 
+const toLower = (value = '') => value.toString().trim().toLowerCase();
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -36,6 +38,7 @@ export const AuthProvider = ({ children }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       const playerID = generatePlayerID();
+      const usernameLower = toLower(username);
 
       // 2. Update display name in Auth
       await updateProfile(user, {
@@ -46,6 +49,7 @@ export const AuthProvider = ({ children }) => {
       await setDoc(doc(db, 'users', user.uid), {
         id: user.uid,
         username: username,
+        usernameLower,
         email: email,
         displayName: displayName || username,
         playerID,
@@ -94,7 +98,11 @@ export const AuthProvider = ({ children }) => {
     }
 
     const uid = auth.currentUser.uid;
-    const safeUpdates = { ...updates, updatedAt: serverTimestamp() };
+    const safeUpdates = {
+      ...updates,
+      ...(updates.username ? { usernameLower: toLower(updates.username) } : {}),
+      updatedAt: serverTimestamp(),
+    };
 
     await setDoc(doc(db, 'users', uid), safeUpdates, { merge: true });
 

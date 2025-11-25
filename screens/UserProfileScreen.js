@@ -112,7 +112,7 @@ export default function UserProfileScreen({ route }) {
       if (isFollowingUser) {
         await unfollowUser(user.id);
       } else {
-        await followUser(user.id, user.username, user.profilePicture);
+        await followUser(user.id, user.username, user.profilePicture, user.playerID);
       }
       await loadUser();
     } finally {

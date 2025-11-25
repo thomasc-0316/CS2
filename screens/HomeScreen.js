@@ -108,10 +108,13 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Top Header with Menu, Tabs, and Search */}
+      {/* Top Header with Friend Search (left), Tabs, and Lineup Search placeholder (right) */}
       <View style={styles.topHeader}>
-        <TouchableOpacity style={styles.menuButton}>
-          <Ionicons name="menu" size={26} color="#fff" />
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => navigation.navigate('PlayerSearch')}
+        >
+          <Ionicons name="people-circle" size={28} color="#FF6800" />
         </TouchableOpacity>
 
         <View style={styles.tabContainer}>
@@ -134,7 +137,7 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.searchButton}>
+        <TouchableOpacity style={styles.searchButton} onPress={() => {}}>
           <Ionicons name="search" size={24} color="#fff" />
         </TouchableOpacity>
       </View>

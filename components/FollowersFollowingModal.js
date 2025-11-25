@@ -29,7 +29,7 @@ export default function FollowersFollowingModal({ visible, onClose, initialTab =
     if (isFollowing(user.id)) {
       await unfollowUser(user.id);
     } else {
-      await followUser(user.id, user.username, user.profilePicture);
+      await followUser(user.id, user.username, user.profilePicture, user.playerID);
     }
   };
 
@@ -40,7 +40,7 @@ export default function FollowersFollowingModal({ visible, onClose, initialTab =
   };
 
   const renderUser = ({ item }) => {
-    const isCurrentUser = item.id === profile.playerID;
+    const isCurrentUser = item.playerID && profile.playerID && item.playerID === profile.playerID;
     const followingUser = isFollowing(item.id);
 
     return (
@@ -59,7 +59,9 @@ export default function FollowersFollowingModal({ visible, onClose, initialTab =
           </View>
           <View style={styles.userDetails}>
             <Text style={styles.username}>{item.username}</Text>
-            {item.id && <Text style={styles.userId}>ID: {item.id}</Text>}
+            <Text style={styles.userId}>
+              Player ID: {item.playerID || 'Not set'}
+            </Text>
           </View>
         </TouchableOpacity>
 
@@ -106,7 +108,7 @@ export default function FollowersFollowingModal({ visible, onClose, initialTab =
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={18} color="#fff" />
+            <Ionicons name="arrow-back" size={20} color="#FF6800" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{profile.username}</Text>
           <View style={styles.placeholder} />

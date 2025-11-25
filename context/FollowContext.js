@@ -8,7 +8,7 @@ const FollowContext = createContext();
 
 export const FollowProvider = ({ children }) => {
   const { currentUser } = useAuth();
-  // Structure: { userId: { username, profilePicture } }
+  // Structure: { userId: { username, profilePicture, playerID } }
   const [following, setFollowing] = useState({});
   const [followers, setFollowers] = useState({});
 
@@ -72,13 +72,13 @@ export const FollowProvider = ({ children }) => {
     }
   };
 
-  const followUser = async (userId, username, profilePicture) => {
+  const followUser = async (userId, username, profilePicture, playerID) => {
     if (!userId || !currentUser || userId === currentUser.uid || isFollowing(userId)) return;
     setFollowing(prev => {
       if (prev[userId]) return prev;
       const newFollowing = {
         ...prev,
-        [userId]: { username, profilePicture },
+        [userId]: { username, profilePicture, playerID },
       };
       saveFollowing(newFollowing);
       return newFollowing;

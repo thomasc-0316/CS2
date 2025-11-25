@@ -48,6 +48,7 @@ export const ProfileProvider = ({ children }) => {
 
       if (snapshot.exists()) {
         const data = snapshot.data() || {};
+        const usernameLower = (data.username || fallbackUsername || '').toLowerCase();
         const nextProfile = {
           username: data.username || fallbackUsername,
           playerID: data.playerID || generatePlayerID(),
@@ -59,8 +60,15 @@ export const ProfileProvider = ({ children }) => {
           following: data.following || 0,
         };
 
-        if (!data.playerID) {
-          await setDoc(docRef, { playerID: nextProfile.playerID }, { merge: true });
+        if (!data.playerID || !data.usernameLower) {
+          await setDoc(
+            docRef,
+            {
+              ...(data.playerID ? {} : { playerID: nextProfile.playerID }),
+              ...(data.usernameLower ? {} : { usernameLower }),
+            },
+            { merge: true }
+          );
         }
 
         setProfile(nextProfile);
@@ -85,6 +93,7 @@ export const ProfileProvider = ({ children }) => {
           id: user.uid,
           email: user.email || '',
           username: newProfile.username,
+          usernameLower: newProfile.username.toLowerCase(),
           playerID: newProfile.playerID,
           bio: '',
           profilePicture: null,
