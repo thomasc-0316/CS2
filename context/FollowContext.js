@@ -1,9 +1,13 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doc, increment, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
+import { useAuth } from './AuthContext';
 
 const FollowContext = createContext();
 
 export const FollowProvider = ({ children }) => {
+  const { currentUser } = useAuth();
   // Structure: { userId: { username, profilePicture } }
   const [following, setFollowing] = useState({});
   const [followers, setFollowers] = useState({});
@@ -45,8 +49,33 @@ export const FollowProvider = ({ children }) => {
     }
   };
 
-  const followUser = (userId, username, profilePicture) => {
+  const bumpRemoteCounts = async (targetUserId, delta) => {
+    if (!currentUser) return;
+    try {
+      const targetRef = doc(db, 'users', targetUserId);
+      await updateDoc(targetRef, {
+        followers: increment(delta),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Failed to update target follower count', error);
+    }
+
+    try {
+      const myRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(myRef, {
+        following: increment(delta),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Failed to update following count', error);
+    }
+  };
+
+  const followUser = async (userId, username, profilePicture) => {
+    if (!userId || !currentUser || userId === currentUser.uid || isFollowing(userId)) return;
     setFollowing(prev => {
+      if (prev[userId]) return prev;
       const newFollowing = {
         ...prev,
         [userId]: { username, profilePicture },
@@ -54,15 +83,21 @@ export const FollowProvider = ({ children }) => {
       saveFollowing(newFollowing);
       return newFollowing;
     });
+
+    await bumpRemoteCounts(userId, 1);
   };
 
-  const unfollowUser = (userId) => {
+  const unfollowUser = async (userId) => {
+    if (!userId || !currentUser || !isFollowing(userId)) return;
     setFollowing(prev => {
+      if (!prev[userId]) return prev;
       const newFollowing = { ...prev };
       delete newFollowing[userId];
       saveFollowing(newFollowing);
       return newFollowing;
     });
+
+    await bumpRemoteCounts(userId, -1);
   };
 
   const isFollowing = (userId) => {

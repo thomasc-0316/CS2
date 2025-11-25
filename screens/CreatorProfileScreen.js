@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,9 +10,11 @@ import LineupCard from '../components/LineupCard';
 export default function CreatorProfileScreen({ route, navigation }) {
   const { userId } = route.params;
   const { isFollowing, followUser, unfollowUser } = useFollow();
+  const [followLoading, setFollowLoading] = useState(false);
   
   const creator = getUserById(userId);
   const following = creator ? isFollowing(creator.id) : false;
+  const followerCount = (creator?.followers || 0) + (following ? 1 : 0);
 
   // Get all lineups by this creator
   const creatorLineups = LINEUPS.filter(lineup => lineup.creatorId === userId);
@@ -26,11 +28,17 @@ export default function CreatorProfileScreen({ route, navigation }) {
     );
   }
 
-  const handleFollowToggle = () => {
-    if (following) {
-      unfollowUser(creator.id);
-    } else {
-      followUser(creator.id, creator.username, creator.profilePicture);
+  const handleFollowToggle = async () => {
+    if (followLoading) return;
+    setFollowLoading(true);
+    try {
+      if (following) {
+        await unfollowUser(creator.id);
+      } else {
+        await followUser(creator.id, creator.username, creator.profilePicture);
+      }
+    } finally {
+      setFollowLoading(false);
     }
   };
 
@@ -74,7 +82,7 @@ export default function CreatorProfileScreen({ route, navigation }) {
         {/* Stats Row */}
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{creator.followers.toLocaleString()}</Text>
+            <Text style={styles.statNumber}>{followerCount.toLocaleString()}</Text>
             <Text style={styles.statLabel}>Followers</Text>
           </View>
           <View style={styles.statDivider} />
@@ -93,6 +101,7 @@ export default function CreatorProfileScreen({ route, navigation }) {
         <TouchableOpacity
           style={[styles.followButton, following && styles.followingButton]}
           onPress={handleFollowToggle}
+          disabled={followLoading}
         >
           <Text style={[styles.followButtonText, following && styles.followingButtonText]}>
             {following ? 'Following' : 'Follow'}

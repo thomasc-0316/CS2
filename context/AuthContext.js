@@ -79,10 +79,41 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Update user profile in Firestore (and Auth display name) then refresh local state
+  const updateUserProfile = async (updates = {}) => {
+    if (!auth.currentUser) {
+      throw new Error('No authenticated user');
+    }
+
+    const uid = auth.currentUser.uid;
+    const safeUpdates = { ...updates, updatedAt: serverTimestamp() };
+
+    await setDoc(doc(db, 'users', uid), safeUpdates, { merge: true });
+
+    if (updates.displayName || updates.username) {
+      await updateProfile(auth.currentUser, {
+        displayName: updates.displayName || updates.username
+      });
+    }
+
+    const freshProfile = await getUserProfile(uid);
+    setCurrentUser((prev) =>
+      prev
+        ? {
+            ...prev,
+            profile: freshProfile
+          }
+        : prev
+    );
+
+    return freshProfile;
+  };
+
   // Logout
   const logout = async () => {
     try {
       await signOut(auth);
+      setCurrentUser(null); // ensure UI immediately reflects logout
     } catch (error) {
       console.error('Logout error:', error);
       throw error;
@@ -131,7 +162,8 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     loading,
-    getUserProfile
+    getUserProfile,
+    updateUserProfile
   };
 
   return (

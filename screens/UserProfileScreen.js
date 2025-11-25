@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
@@ -8,6 +8,7 @@ import { useFollow } from '../context/FollowContext';
 import { LINEUPS } from '../data/lineups';
 import { MAPS } from '../data/maps';
 import { getUserById } from '../data/users';
+import { useAuth } from '../context/AuthContext';
 
 // Lineup card component
 function LineupCard({ item, navigation, getMapName, getUpvoteCount }) {
@@ -64,10 +65,26 @@ export default function UserProfileScreen({ route }) {
   const { userId } = route.params;
   const { getUpvoteCount } = useUpvotes();
   const { isFollowing, followUser, unfollowUser, getUserFollowerCount } = useFollow();
+  const { getUserProfile } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loadingUser, setLoadingUser] = useState(true);
 
-  // Get user data
-  const user = getUserById(userId);
+  const loadUser = async () => {
+    try {
+      setLoadingUser(true);
+      const liveUser = await getUserProfile(userId);
+      const fallbackUser = getUserById(userId);
+      setUser(liveUser || fallbackUser || null);
+    } finally {
+      setLoadingUser(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUser();
+  }, [userId]);
   const isFollowingUser = user ? isFollowing(user.id) : false;
 
   // Calculate dynamic follower count (base followers + current app followers)
@@ -86,13 +103,20 @@ export default function UserProfileScreen({ route }) {
     return map ? map.name : 'Unknown';
   };
 
-  const handleFollowToggle = () => {
+  const handleFollowToggle = async () => {
     if (!user) return;
+    if (followLoading) return;
+    setFollowLoading(true);
 
-    if (isFollowingUser) {
-      unfollowUser(user.id);
-    } else {
-      followUser(user.id, user.username, user.profilePicture);
+    try {
+      if (isFollowingUser) {
+        await unfollowUser(user.id);
+      } else {
+        await followUser(user.id, user.username, user.profilePicture);
+      }
+      await loadUser();
+    } finally {
+      setFollowLoading(false);
     }
   };
 
@@ -164,6 +188,7 @@ export default function UserProfileScreen({ route }) {
               isFollowingUser && styles.followingButton
             ]}
             onPress={handleFollowToggle}
+            disabled={followLoading}
           >
             <Text style={[
               styles.followButtonText,
@@ -205,6 +230,14 @@ export default function UserProfileScreen({ route }) {
       setRefreshing(false);
     }, 1000);
   };
+
+  if (loadingUser) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator style={{ marginTop: 40 }} color="#FF6800" />
+      </View>
+    );
+  }
 
   if (!user) {
     return (
