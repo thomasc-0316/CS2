@@ -134,12 +134,6 @@ export default function ProfileScreen() {
   // Get user profile prioritizing locally edited profile, with Firebase as fallback
   const profileFromAuth = currentUser?.profile || {};
   const profileFromLocal = storedProfile || {};
-  const fallbackPlayerIdSource =
-    profileFromLocal.playerID
-    || profileFromAuth.id
-    || profileFromAuth.playerID
-    || currentUser?.uid
-    || '';
   const profile = {
     bio: '',
     profilePicture: null,
@@ -156,7 +150,7 @@ export default function ProfileScreen() {
     playerID:
       profileFromLocal.playerID
       || profileFromAuth.playerID
-      || (fallbackPlayerIdSource ? fallbackPlayerIdSource.substring(0, 9).toUpperCase() : 'N/A'),
+      || 'N/A',
   };
   const followerCount = getFollowersCount() || profile.followers || 0;
   const followingCount = getFollowingCount() || profile.following || 0;

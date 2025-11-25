@@ -50,8 +50,7 @@ export default function PreviewPostScreen({ route, navigation }) {
       {/* Header with Back and Action buttons */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerButton} onPress={handleGoBack}>
-          <Ionicons name="arrow-back" size={18} color="#fff" />
-          <Text style={styles.headerButtonText}>Edit</Text>
+          <Ionicons name="arrow-back" size={22} color="#FF6800" />
         </TouchableOpacity>
         
         <Text style={styles.headerTitle}>Preview</Text>
@@ -148,11 +147,7 @@ const styles = StyleSheet.create({
   headerButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-  },
-  headerButtonText: {
-    color: '#fff',
-    fontSize: 14,
+    padding: 4,
   },
   headerTitle: {
     fontSize: 18,

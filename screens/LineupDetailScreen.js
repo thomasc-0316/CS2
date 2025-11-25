@@ -77,7 +77,7 @@ export default function LineupDetailScreen({ route, navigation }) {
       if (isFollowingCreator) {
         await unfollowUser(creator.id);
       } else {
-        await followUser(creator.id, creator.username, creator.profilePicture);
+        await followUser(creator.id, creator.username, creator.profilePicture, creator.playerID);
       }
     } finally {
       setFollowLoading(false);

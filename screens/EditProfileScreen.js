@@ -148,8 +148,8 @@ export default function EditProfileScreen({ navigation }) {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleCancel}>
-          <Text style={styles.cancelButton}>Cancel</Text>
+        <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={22} color="#FF6800" />
         </TouchableOpacity>
         
         <Text style={styles.headerTitle}>Edit Profile</Text>
@@ -260,9 +260,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#333',
   },
-  cancelButton: {
-    fontSize: 16,
-    color: '#fff',
+  backButton: {
+    padding: 4,
   },
   headerTitle: {
     fontSize: 18,
