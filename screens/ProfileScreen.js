@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Platform, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
@@ -6,8 +6,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFavorites } from '../context/FavoritesContext';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useDrafts } from '../context/DraftsContext';
-import { useProfile } from '../context/ProfileContext';
 import { useFollow } from '../context/FollowContext';
+import { useAuth } from '../context/AuthContext';  // ADD THIS
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';  // ADD THIS
+import { db } from '../firebaseConfig';  // ADD THIS
 import { LINEUPS } from '../data/lineups';
 import { MAPS } from '../data/maps';
 import FollowersFollowingModal from '../components/FollowersFollowingModal';
@@ -69,7 +71,7 @@ function LineupCard({ item, navigation, getMapName, getUpvoteCount }) {
   return (
     <TouchableOpacity
       style={styles.lineupCard}
-      onPress={() => navigation.navigate('LineupDetail', { lineupId: item.id })}
+      onPress={() => navigation.navigate('LineupDetail', { lineup: item })}
     >
       <Image
         source={typeof item.landImage === 'string' ? { uri: item.landImage } : item.landImage}
@@ -117,17 +119,60 @@ export default function ProfileScreen() {
   const { getFavorites } = useFavorites();
   const { getUpvoteCount } = useUpvotes();
   const { drafts, deleteDraft } = useDrafts();
-  const { profile, updateProfile } = useProfile();
   const { getFollowingCount, getFollowersCount } = useFollow();
+  const { currentUser, logout } = useAuth();  // ADD THIS - Get current user and logout
+  
   const [activeTab, setActiveTab] = useState('favorites');
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalTab, setFollowModalTab] = useState('followers');
   const [refreshing, setRefreshing] = useState(false);
+  const [myLineups, setMyLineups] = useState([]);  // ADD THIS - State for user's lineups
+  const [loading, setLoading] = useState(false);  // ADD THIS
+
+  // Get user profile from Firebase Auth
+  const profile = currentUser?.profile || {
+    username: currentUser?.email?.split('@')[0] || 'User',
+    playerID: currentUser?.uid?.substring(0, 9).toUpperCase() || 'N/A',
+    bio: '',
+    profilePicture: null,
+    followers: 0,
+    following: 0,
+    totalLineups: 0
+  };
 
   const favoriteIds = getFavorites();
   const favoriteLineups = LINEUPS.filter(lineup => favoriteIds.includes(lineup.id));
-  const myLineups = [];
   const upvotedLineups = [];
+
+  // Fetch user's lineups from Firestore
+  useEffect(() => {
+    if (currentUser && activeTab === 'myLineups') {
+      fetchMyLineups();
+    }
+  }, [currentUser, activeTab]);
+
+  const fetchMyLineups = async () => {
+    if (!currentUser) return;
+    
+    try {
+      setLoading(true);
+      const q = query(
+        collection(db, 'lineups'),
+        where('creatorId', '==', currentUser.uid),
+        orderBy('uploadedAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const lineups = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setMyLineups(lineups);
+    } catch (error) {
+      console.error('Error fetching lineups:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Calculate total upvotes received on user's posts
   const totalUpvotesReceived = myLineups.reduce((total, lineup) => {
@@ -180,8 +225,9 @@ export default function ProfileScreen() {
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Save',
-            onPress: (text) => {
-              updateProfile({ bio: text || '' });
+            onPress: async (text) => {
+              // TODO: Update bio in Firestore
+              console.log('Update bio to:', text);
             },
           },
         ],
@@ -192,6 +238,27 @@ export default function ProfileScreen() {
       // For Android, navigate to edit profile
       navigation.navigate('EditProfile');
     }
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to logout');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const openFollowersModal = () => {
@@ -243,18 +310,18 @@ export default function ProfileScreen() {
           {/* Stats (left side, compact) */}
           <View style={styles.statsContainer}>
             <TouchableOpacity style={styles.statItem} onPress={openFollowersModal}>
-              <Text style={styles.statNumber}>{getFollowersCount()}</Text>
+              <Text style={styles.statNumber}>{profile.followers || 0}</Text>
               <Text style={styles.statLabel}>Followers</Text>
             </TouchableOpacity>
             <View style={styles.statDivider} />
             <TouchableOpacity style={styles.statItem} onPress={openFollowingModal}>
-              <Text style={styles.statNumber}>{getFollowingCount()}</Text>
+              <Text style={styles.statNumber}>{profile.following || 0}</Text>
               <Text style={styles.statLabel}>Following</Text>
             </TouchableOpacity>
             <View style={styles.statDivider} />
             <TouchableOpacity style={styles.statItem}>
-              <Text style={styles.statNumber}>{totalUpvotesReceived}</Text>
-              <Text style={styles.statLabel}>Upvotes</Text>
+              <Text style={styles.statNumber}>{myLineups.length}</Text>
+              <Text style={styles.statLabel}>Lineups</Text>
             </TouchableOpacity>
           </View>
 
@@ -267,8 +334,11 @@ export default function ProfileScreen() {
               <Text style={styles.editProfileText}>Edit Profile</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.settingsButtonMain}>
-              <Ionicons name="settings-outline" size={20} color="#fff" />
+            <TouchableOpacity 
+              style={styles.settingsButtonMain}
+              onPress={handleLogout}
+            >
+              <Ionicons name="log-out-outline" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
         </View>
@@ -353,12 +423,12 @@ export default function ProfileScreen() {
     );
   };
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    // Simulate refresh - in a real app, you'd refetch data here
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+    if (activeTab === 'myLineups') {
+      await fetchMyLineups();
+    }
+    setRefreshing(false);
   };
 
   return (
@@ -396,7 +466,9 @@ export default function ProfileScreen() {
   );
 }
 
+// ... keep all your existing styles exactly as they are
 const styles = StyleSheet.create({
+  // ... (paste all your existing styles here - they stay the same)
   container: {
     flex: 1,
     backgroundColor: '#1a1a1a',
