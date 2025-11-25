@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -80,12 +80,6 @@ export default function TacticsScreen() {
     }
   }, [myVote, optimisticVote]);
 
-  useEffect(() => {
-    if (!myVote) {
-      setOptimisticVote(null);
-    }
-  }, [myVote]);
-
   const lineupsById = useMemo(() => {
     return LINEUPS.reduce((acc, lineup) => {
       acc[lineup.id] = lineup;
@@ -138,6 +132,7 @@ export default function TacticsScreen() {
       players.map((p) => [p.uid, p]),
     );
     const grouped = {};
+
     Object.entries(room.grenadeSelections || {}).forEach(
       ([grenadeId, uid]) => {
         const lineup = lineupsById[Number(grenadeId)];
@@ -215,43 +210,28 @@ export default function TacticsScreen() {
       </View>
     ) : null;
 
-  const renderRoomHeader = (showPhase = true, extraAction = null) => (
+  const renderRoomHeader = (showPhase = true) => (
     <View style={styles.section}>
       <View style={styles.rowBetween}>
         <Text style={styles.heading}>Room {room?.code}</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity onPress={leaveRoom}>
-            <Text style={styles.leaveText}>Leave</Text>
-          </TouchableOpacity>
-          {extraAction}
-        </View>
+        <TouchableOpacity onPress={leaveRoom}>
+          <Text style={styles.leaveText}>Leave</Text>
+        </TouchableOpacity>
       </View>
       {showPhase ? (
         <Text style={styles.subheading}>
           Phase: {normalizedPhase.split('_').join(' ')}
-          {map ? ' - ' + map.name : ''}
+          {map ? ` · ${map.name}` : ''}
         </Text>
       ) : null}
       <View style={styles.playerRow}>
-        {players.map((player) => {
-          const avatar =
-            player.avatar || player.profilePicture || player.photoURL || null;
-          const isLeader = room?.iglId === player.uid;
-          return (
-            <View
-              key={player.uid}
-              style={[styles.playerAvatar, isLeader && styles.playerAvatarIGL]}
-            >
-              {avatar ? (
-                <Image source={{ uri: avatar }} style={styles.avatarImage} />
-              ) : (
-                <Text style={styles.playerAvatarText}>
-                  {player.username?.[0]?.toUpperCase() || '?'}
-                </Text>
-              )}
-            </View>
-          );
-        })}
+        {players.map((player) => (
+          <View key={player.uid} style={styles.playerAvatar}>
+            <Text style={styles.playerAvatarText}>
+              {player.username?.[0]?.toUpperCase() || '?'}
+            </Text>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -261,7 +241,7 @@ export default function TacticsScreen() {
     return (
       <View key={player.uid} style={styles.playerChip}>
         <Text style={styles.playerChipText}>
-          {player.username}{isLeader ? ' (IGL)' : ''}
+          {player.username} ({player.uid.slice(-4)}){isLeader ? ' • IGL' : ''}
         </Text>
       </View>
     );
@@ -289,7 +269,7 @@ export default function TacticsScreen() {
 
   const renderTacticCard = (tactic) => {
     const votes = tacticVotes[tactic.id] || [];
-    const isMyVote = displayMyVote === tactic.id;
+    const isMyVote = myVote === tactic.id;
     const isIGLPick = pendingTacticId === tactic.id;
     return (
       <TouchableOpacity
@@ -300,9 +280,7 @@ export default function TacticsScreen() {
           isIGLPick && styles.tacticActive,
           !isIGL && styles.touchableCard,
         ]}
-        activeOpacity={0.9}
         onPress={() => {
-          setOptimisticVote(tactic.id);
           voteForTactic(tactic.id);
           if (isIGL) {
             setPendingTacticId(tactic.id);
@@ -315,7 +293,7 @@ export default function TacticsScreen() {
         <Text style={styles.tacticTitle}>{tactic.title}</Text>
         <Text style={styles.tacticDescription}>{tactic.description}</Text>
         <Text style={styles.tacticMeta}>
-          {tactic.lineupIds.length} grenades - {tactic.side} - {tactic.category}
+          {tactic.lineupIds.length} grenades · {tactic.side} · {tactic.category}
         </Text>
         {isIGLPick ? (
           <Text style={styles.iglChoice}>IGL choice</Text>
@@ -341,7 +319,7 @@ export default function TacticsScreen() {
       >
         <Text style={styles.grenadeTitle}>{lineup.title}</Text>
         <Text style={styles.grenadeMeta}>
-          {lineup.nadeType} - {lineup.site} - {lineup.side}
+          {lineup.nadeType} · {lineup.site} · {lineup.side}
         </Text>
         <Text style={styles.grenadeMeta}>#{lineup.id}</Text>
       </TouchableOpacity>
@@ -431,17 +409,7 @@ export default function TacticsScreen() {
       {renderRoomHeader()}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Pick the map</Text>
-        {isIGL ? (
-          <View style={styles.mapGrid}>{MAPS.map(renderMapCard)}</View>
-        ) : (
-          <View style={styles.mapGrid}>
-            {map ? (
-              renderMapCard(map)
-            ) : (
-              <Text style={styles.subheading}>Waiting for IGL to select a map</Text>
-            )}
-          </View>
-        )}
+        <View style={styles.mapGrid}>{MAPS.map(renderMapCard)}</View>
         {isIGL ? (
           <TouchableOpacity
             style={[
@@ -454,9 +422,7 @@ export default function TacticsScreen() {
             <Text style={styles.buttonText}>Continue to lobby</Text>
           </TouchableOpacity>
         ) : (
-          <Text style={styles.subheading}>
-            {map ? 'Map selected by IGL' : 'Waiting for IGL to select a map'}
-          </Text>
+          <Text style={styles.subheading}>Waiting for IGL to select a map</Text>
         )}
       </View>
       {renderError()}
@@ -589,7 +555,7 @@ export default function TacticsScreen() {
           <View>
             <Text style={styles.sectionTitle}>Grenade draft</Text>
             <Text style={styles.subheading}>
-              {activeTactic?.title || 'Pick a tactic'} - {timerRemaining || 0}s
+              {activeTactic?.title || 'Pick a tactic'} · {timerRemaining || 0}s
               {room?.timerPaused ? ' (paused)' : ''}
             </Text>
           </View>
@@ -630,14 +596,7 @@ export default function TacticsScreen() {
 
   const renderExecution = () => (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContainer}>
-      {renderRoomHeader(
-        false,
-        isIGL ? (
-          <TouchableOpacity style={styles.endRoundTopButton} onPress={endRound}>
-            <Text style={styles.endRoundTopText}>End round</Text>
-          </TouchableOpacity>
-        ) : null,
-      )}
+      {renderRoomHeader(false)}
       <View style={styles.section}>
         <View style={styles.rowBetween}>
           <View>
@@ -645,9 +604,14 @@ export default function TacticsScreen() {
               Executing: {activeTactic?.title || 'Tactic'}
             </Text>
             <Text style={styles.subheading}>
-              Side {room?.side || 'T'} - {map ? map.name : 'No map'}
+              Side {room?.side || 'T'} · {map ? map.name : 'No map'}
             </Text>
           </View>
+          {isIGL ? (
+            <TouchableOpacity style={styles.secondaryButton} onPress={endRound}>
+              <Text style={styles.secondaryText}>End round</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
 
@@ -759,9 +723,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
   },
-  headerActions: {
-    alignItems: 'flex-end',
-  },
   playerAvatar: {
     width: 32,
     height: 32,
@@ -770,16 +731,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
-    overflow: 'hidden',
-  },
-  playerAvatarIGL: {
-    borderWidth: 2,
-    borderColor: '#ffcc00',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 16,
   },
   playerAvatarText: {
     color: '#fff',
@@ -829,8 +780,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   tacticCard: {
-    padding: 14,
-    paddingRight: 28,
+    padding: 12,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#222',
@@ -866,8 +816,8 @@ const styles = StyleSheet.create({
   },
   voteBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 10,
+    left: 10,
     backgroundColor: '#FF6800',
     borderRadius: 10,
     paddingHorizontal: 8,
@@ -995,18 +945,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  endRoundTopButton: {
-    marginTop: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FF6800',
-  },
-  endRoundTopText: {
-    color: '#FF6800',
-    fontWeight: '700',
-  },
   buttonText: {
     color: '#fff',
     fontWeight: '600',
@@ -1077,5 +1015,3 @@ const styles = StyleSheet.create({
     opacity: 0.95,
   },
 });
-
-

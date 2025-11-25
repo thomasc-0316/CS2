@@ -22,10 +22,18 @@ import { auth, db } from '../firebaseConfig';
 
 const TacticsContext = createContext();
 
-const SELECTION_DURATION = 10000;
-const EXECUTION_DURATION = 30000;
+const DRAFT_DURATION_MS = 10000;
 const MAX_PLAYERS = 5;
 const MAX_GRENADES_PER_PLAYER = 4;
+const PHASES = {
+  MAP_SELECT: 'MAP_SELECT',
+  PREP: 'PREP',
+  TACTIC_VOTE: 'TACTIC_VOTE',
+  THROW_DRAFT: 'THROW_DRAFT',
+  EXECUTION: 'EXECUTION',
+};
+const DEFAULT_SIDE = 'T';
+const DEFAULT_TACTIC_SOURCE = 'default';
 
 const getDefaultUsername = (uid) => `Player-${uid.slice(-4)}`;
 
@@ -92,24 +100,19 @@ export const TacticsProvider = ({ children }) => {
 
     const roomRef = doc(db, 'rooms', roomCode);
 
-    if (room.phase === 'SELECTION') {
+    if (room.phase === PHASES.THROW_DRAFT || room.phase === 'SELECTION') {
       await updateDoc(roomRef, {
-        phase: 'EXECUTION',
-        timerEnd: scheduleTimestamp(EXECUTION_DURATION),
-      });
-    } else if (room.phase === 'EXECUTION') {
-      await updateDoc(roomRef, {
-        phase: 'LOBBY',
+        phase: PHASES.EXECUTION,
         timerEnd: null,
-        activeTacticId: null,
-        grenadeSelections: {},
+        timerPaused: false,
+        pausedRemainingMs: null,
       });
     }
-  }, [isIGL, room, roomCode, scheduleTimestamp]);
+  }, [isIGL, room, roomCode]);
 
   // Automatic phase transitions controlled by the IGL to avoid conflicting writes
   useEffect(() => {
-    if (!room || !isIGL || !room.timerEnd) return;
+    if (!room || !isIGL || !room.timerEnd || room.timerPaused) return;
     const timerEnd = room.timerEnd?.toDate?.() || new Date(room.timerEnd);
     const timeUntilEnd = timerEnd.getTime() - Date.now();
 
@@ -123,7 +126,7 @@ export const TacticsProvider = ({ children }) => {
     }, timeUntilEnd);
 
     return () => clearTimeout(timeoutId);
-  }, [room, isIGL, handlePhaseAdvance]);
+  }, [room?.phase, room?.timerEnd, room?.timerPaused, isIGL, handlePhaseAdvance]);
 
   const createRoom = useCallback(async () => {
     if (!user) return;
@@ -144,14 +147,20 @@ export const TacticsProvider = ({ children }) => {
       const newRoom = {
         iglId: user.uid,
         mapId: null,
-        phase: 'LOBBY',
+        phase: PHASES.MAP_SELECT,
         activeTacticId: null,
+        tacticVotes: {},
+        tacticSource: DEFAULT_TACTIC_SOURCE,
+        side: DEFAULT_SIDE,
         timerEnd: null,
+        timerPaused: false,
+        pausedRemainingMs: null,
         grenadeSelections: {},
         players: [
           {
             uid: user.uid,
             username: getDefaultUsername(user.uid),
+            avatar: user?.photoURL || null,
           },
         ],
         createdAt: Timestamp.now(),
@@ -196,7 +205,11 @@ export const TacticsProvider = ({ children }) => {
           transaction.update(roomRef, {
             players: [
               ...players,
-              { uid: user.uid, username: getDefaultUsername(user.uid) },
+              {
+                uid: user.uid,
+                username: getDefaultUsername(user.uid),
+                avatar: user?.photoURL || null,
+              },
             ],
           });
         });
@@ -225,15 +238,135 @@ export const TacticsProvider = ({ children }) => {
     [roomCode, isIGL],
   );
 
-  const startTactic = useCallback(
+  const goToPrepPhase = useCallback(async () => {
+    if (!roomCode || !isIGL) return;
+    if (!room?.mapId) {
+      setError('Select a map before continuing.');
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'rooms', roomCode), {
+        phase: PHASES.PREP,
+        timerEnd: null,
+        timerPaused: false,
+        pausedRemainingMs: null,
+      });
+    } catch (err) {
+      console.error('Failed to open lobby', err);
+      setError('Unable to open lobby.');
+    }
+  }, [roomCode, isIGL, room?.mapId]);
+
+  const returnToMapSelect = useCallback(async () => {
+    if (!roomCode || !isIGL) return;
+    try {
+      await updateDoc(doc(db, 'rooms', roomCode), {
+        phase: PHASES.MAP_SELECT,
+        activeTacticId: null,
+        tacticVotes: {},
+        grenadeSelections: {},
+        timerEnd: null,
+        timerPaused: false,
+        pausedRemainingMs: null,
+      });
+    } catch (err) {
+      console.error('Failed to return to map select', err);
+      setError('Unable to return to map select.');
+    }
+  }, [roomCode, isIGL]);
+
+  const startMatch = useCallback(async () => {
+    if (!roomCode || !isIGL || !room?.mapId) return;
+    try {
+      await updateDoc(doc(db, 'rooms', roomCode), {
+        phase: PHASES.TACTIC_VOTE,
+        activeTacticId: null,
+        tacticVotes: {},
+        grenadeSelections: {},
+        timerEnd: null,
+        timerPaused: false,
+        pausedRemainingMs: null,
+      });
+    } catch (err) {
+      console.error('Failed to start match', err);
+      setError('Unable to start match.');
+    }
+  }, [roomCode, isIGL, room?.mapId]);
+
+  const setSideSelection = useCallback(
+    async (side) => {
+      if (!roomCode || !isIGL || !['T', 'CT'].includes(side)) return;
+      try {
+        await updateDoc(doc(db, 'rooms', roomCode), { side });
+      } catch (err) {
+        console.error('Failed to set side', err);
+        setError('Unable to set side.');
+      }
+    },
+    [roomCode, isIGL],
+  );
+
+  const setTacticSource = useCallback(
+    async (source) => {
+      if (!roomCode || !isIGL) return;
+      if (!['default', 'personal'].includes(source)) return;
+      try {
+        await updateDoc(doc(db, 'rooms', roomCode), { tacticSource: source });
+      } catch (err) {
+        console.error('Failed to set tactic source', err);
+        setError('Unable to update tactic source.');
+      }
+    },
+    [roomCode, isIGL],
+  );
+
+  const voteForTactic = useCallback(
+    async (tacticId) => {
+      if (!roomCode || !user || !tacticId) return;
+      const roomRef = doc(db, 'rooms', roomCode);
+
+      try {
+        await runTransaction(db, async (transaction) => {
+          const snapshot = await transaction.get(roomRef);
+          if (!snapshot.exists()) return;
+
+          const data = snapshot.data();
+          const votes = data.tacticVotes || {};
+
+          const cleaned = Object.entries(votes).reduce((acc, [id, voters]) => {
+            const filtered = (voters || []).filter((uid) => uid !== user.uid);
+            if (filtered.length) {
+              acc[id] = filtered;
+            }
+            return acc;
+          }, {});
+
+          const alreadyVoted = (votes[tacticId] || []).includes(user.uid);
+          if (!alreadyVoted) {
+            cleaned[tacticId] = [...(cleaned[tacticId] || []), user.uid];
+          }
+
+          transaction.update(roomRef, { tacticVotes: cleaned });
+        });
+      } catch (err) {
+        console.error('Failed to vote tactic', err);
+        setError('Unable to register vote.');
+      }
+    },
+    [roomCode, user],
+  );
+
+  const startGrenadeDraft = useCallback(
     async (tacticId, mapId) => {
       if (!roomCode || !isIGL || !tacticId || !mapId) return;
       try {
         await updateDoc(doc(db, 'rooms', roomCode), {
           mapId,
           activeTacticId: tacticId,
-          phase: 'SELECTION',
-          timerEnd: scheduleTimestamp(SELECTION_DURATION),
+          phase: PHASES.THROW_DRAFT,
+          timerEnd: scheduleTimestamp(DRAFT_DURATION_MS),
+          timerPaused: false,
+          pausedRemainingMs: null,
           grenadeSelections: {},
         });
       } catch (err) {
@@ -246,7 +379,13 @@ export const TacticsProvider = ({ children }) => {
 
   const selectGrenade = useCallback(
     async (grenadeId) => {
-      if (!roomCode || !user || !room || room.phase !== 'SELECTION') return;
+      if (
+        !roomCode ||
+        !user ||
+        !room ||
+        (room.phase !== PHASES.THROW_DRAFT && room.phase !== 'SELECTION')
+      )
+        return;
 
       const selections = room.grenadeSelections || {};
       const claimedBy = selections[grenadeId];
@@ -284,6 +423,77 @@ export const TacticsProvider = ({ children }) => {
     [roomCode, user, room],
   );
 
+  const toggleTimerPause = useCallback(async () => {
+    if (!roomCode || !isIGL || !room || room.phase !== PHASES.THROW_DRAFT) {
+      return;
+    }
+
+    const roomRef = doc(db, 'rooms', roomCode);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(roomRef);
+        if (!snapshot.exists()) return;
+        const data = snapshot.data();
+
+        if (data.timerPaused) {
+          const remaining =
+            data.pausedRemainingMs && data.pausedRemainingMs > 0
+              ? data.pausedRemainingMs
+              : DRAFT_DURATION_MS;
+          transaction.update(roomRef, {
+            timerPaused: false,
+            pausedRemainingMs: null,
+            timerEnd: Timestamp.fromDate(new Date(Date.now() + remaining)),
+          });
+        } else if (data.timerEnd) {
+          const end = data.timerEnd?.toDate?.() || new Date(data.timerEnd);
+          const remaining = Math.max(0, end.getTime() - Date.now());
+          transaction.update(roomRef, {
+            timerPaused: true,
+            pausedRemainingMs: remaining,
+            timerEnd: null,
+          });
+        }
+      });
+    } catch (err) {
+      console.error('Failed to toggle timer', err);
+      setError('Unable to update timer.');
+    }
+  }, [roomCode, isIGL, room]);
+
+  const skipToExecution = useCallback(async () => {
+    if (!roomCode || !isIGL) return;
+    try {
+      await updateDoc(doc(db, 'rooms', roomCode), {
+        phase: PHASES.EXECUTION,
+        timerEnd: null,
+        timerPaused: false,
+        pausedRemainingMs: null,
+      });
+    } catch (err) {
+      console.error('Failed to skip timer', err);
+      setError('Unable to skip timer.');
+    }
+  }, [roomCode, isIGL]);
+
+  const endRound = useCallback(async () => {
+    if (!roomCode || !isIGL) return;
+    try {
+      await updateDoc(doc(db, 'rooms', roomCode), {
+        phase: PHASES.TACTIC_VOTE,
+        activeTacticId: null,
+        tacticVotes: {},
+        grenadeSelections: {},
+        timerEnd: null,
+        timerPaused: false,
+        pausedRemainingMs: null,
+      });
+    } catch (err) {
+      console.error('Failed to end round', err);
+      setError('Unable to end round.');
+    }
+  }, [roomCode, isIGL]);
+
   const leaveRoom = useCallback(async () => {
     if (!roomCode || !user) {
       setRoomCode('');
@@ -315,6 +525,17 @@ export const TacticsProvider = ({ children }) => {
             ? updatedPlayers[0]?.uid || null
             : roomData.iglId;
 
+        const cleanedVotes = Object.entries(roomData.tacticVotes || {}).reduce(
+          (acc, [id, voters]) => {
+            const remaining = (voters || []).filter((uid) => uid !== user.uid);
+            if (remaining.length) {
+              acc[id] = remaining;
+            }
+            return acc;
+          },
+          {},
+        );
+
         transaction.update(roomRef, {
           players: updatedPlayers,
           iglId: nextIglId,
@@ -323,6 +544,7 @@ export const TacticsProvider = ({ children }) => {
               ([, uid]) => uid !== user.uid,
             ),
           ),
+          tacticVotes: cleanedVotes,
         });
       });
     } catch (err) {
@@ -344,8 +566,17 @@ export const TacticsProvider = ({ children }) => {
       createRoom,
       joinRoom,
       setMap,
-      startTactic,
+      goToPrepPhase,
+      returnToMapSelect,
+      startMatch,
+      setSide: setSideSelection,
+      setTacticSource,
+      voteForTactic,
+      startGrenadeDraft,
       selectGrenade,
+      toggleTimerPause,
+      skipToExecution,
+      endRound,
       leaveRoom,
       clearError: () => setError(''),
     }),
@@ -359,8 +590,17 @@ export const TacticsProvider = ({ children }) => {
       createRoom,
       joinRoom,
       setMap,
-      startTactic,
+      goToPrepPhase,
+      returnToMapSelect,
+      startMatch,
+      setSideSelection,
+      setTacticSource,
+      voteForTactic,
+      startGrenadeDraft,
       selectGrenade,
+      toggleTimerPause,
+      skipToExecution,
+      endRound,
       leaveRoom,
     ],
   );
