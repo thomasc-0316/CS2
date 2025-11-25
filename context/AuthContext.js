@@ -11,6 +11,12 @@ import { auth, db } from '../firebaseConfig';
 
 const AuthContext = createContext();
 
+const generatePlayerID = () => {
+  const timestamp = Date.now().toString().slice(-6);
+  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+  return `${timestamp}${random}`;
+};
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -29,6 +35,7 @@ export const AuthProvider = ({ children }) => {
       // 1. Create Firebase Auth account
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      const playerID = generatePlayerID();
 
       // 2. Update display name in Auth
       await updateProfile(user, {
@@ -41,6 +48,7 @@ export const AuthProvider = ({ children }) => {
         username: username,
         email: email,
         displayName: displayName || username,
+        playerID,
         bio: '',
         profilePicture: null,
         pronouns: '',
