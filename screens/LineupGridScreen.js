@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,12 @@ import {
   TouchableOpacity,
   Animated,
   TextInput,
-  RefreshControl
+  RefreshControl,
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LINEUPS } from '../data/lineups';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 import LineupCard from '../components/LineupCard';
 
 export default function LineupGridScreen({ navigation, route }) {
@@ -19,6 +21,8 @@ export default function LineupGridScreen({ navigation, route }) {
   const [slideAnim] = useState(new Animated.Value(300));
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);  // ADD THIS
+  const [mapLineups, setMapLineups] = useState([]);  // ADD THIS - Store Firestore lineups
 
   // Applied filter states (arrays for multi-select)
   const [selectedSides, setSelectedSides] = useState([]);
@@ -30,8 +34,39 @@ export default function LineupGridScreen({ navigation, route }) {
   const [tempSites, setTempSites] = useState([]);
   const [tempNadeTypes, setTempNadeTypes] = useState([]);
 
-  // Get lineups for this map
-  const mapLineups = LINEUPS.filter(lineup => lineup.mapId === map.id);
+  // Fetch lineups from Firestore on mount
+  useEffect(() => {
+    fetchLineups();
+  }, [map.id]);
+
+  const fetchLineups = async () => {
+    try {
+      setLoading(true);
+      
+      const q = query(
+        collection(db, 'lineups'),
+        where('mapId', '==', map.id),
+        where('isPublic', '==', true),
+        orderBy('uploadedAt', 'desc')
+      );
+      
+      const snapshot = await getDocs(q);
+      const lineups = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Images are already URLs from Firebase Storage!
+      setMapLineups(lineups);
+    } catch (error) {
+      console.error('Error fetching lineups:', error);
+      if (error.code === 'failed-precondition') {
+        console.log('⚠️ Index required! Click the link in the error to create it.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Apply filters and search
   const filteredLineups = mapLineups.filter(lineup => {
@@ -56,9 +91,10 @@ export default function LineupGridScreen({ navigation, route }) {
     return true;
   });
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    await fetchLineups();
+    setRefreshing(false);
   };
 
   const openFilter = () => {
@@ -120,6 +156,16 @@ export default function LineupGridScreen({ navigation, route }) {
   };
 
   const activeFilterCount = selectedSides.length + selectedSites.length + selectedNadeTypes.length;
+
+  // Show loading spinner on first load
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF6800" />
+        <Text style={styles.loadingText}>Loading lineups...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -265,6 +311,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1a1a1a',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+  },
+  loadingText: {
+    color: '#888',
+    marginTop: 15,
+    fontSize: 16,
   },
   searchContainer: {
     flexDirection: 'row',

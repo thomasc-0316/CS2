@@ -11,9 +11,10 @@ import {
 import { Image } from 'expo-image';
 import { Asset } from 'expo-asset';
 import ImageView from 'react-native-image-viewing';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
 import { TACTICS } from '../data/tactics';
-import { LINEUPS } from '../data/lineups';
 import { useTactics } from '../context/TacticsContext';
 
 const PHASES = {
@@ -56,6 +57,8 @@ export default function TacticsScreen() {
   const [viewerImages, setViewerImages] = useState([]);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [optimisticVote, setOptimisticVote] = useState(null);
+  const [mapLineups, setMapLineups] = useState([]);
+  const [lineupsLoading, setLineupsLoading] = useState(false);
 
   const normalizedPhase = useMemo(() => {
     if (!room?.phase) return PHASES.MAP_SELECT;
@@ -63,6 +66,40 @@ export default function TacticsScreen() {
     if (room.phase === 'SELECTION') return PHASES.THROW_DRAFT;
     return room.phase;
   }, [room?.phase]);
+
+  // Fetch lineups for the selected map
+  useEffect(() => {
+    const fetchMapLineups = async () => {
+      if (!room?.mapId) {
+        setMapLineups([]);
+        return;
+      }
+
+      try {
+        setLineupsLoading(true);
+
+        const q = query(
+          collection(db, 'lineups'),
+          where('mapId', '==', room.mapId),
+          where('isPublic', '==', true)
+        );
+
+        const snapshot = await getDocs(q);
+        const lineups = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        setMapLineups(lineups);
+      } catch (error) {
+        console.error('Error fetching map lineups:', error);
+      } finally {
+        setLineupsLoading(false);
+      }
+    };
+
+    fetchMapLineups();
+  }, [room?.mapId]);
 
   useEffect(() => {
     setPendingTacticId(room?.activeTacticId || null);
@@ -87,11 +124,11 @@ export default function TacticsScreen() {
   }, [myVote]);
 
   const lineupsById = useMemo(() => {
-    return LINEUPS.reduce((acc, lineup) => {
+    return mapLineups.reduce((acc, lineup) => {
       acc[lineup.id] = lineup;
       return acc;
     }, {});
-  }, []);
+  }, [mapLineups]);
 
   const players = room?.players || [];
   const map = useMemo(
@@ -616,9 +653,16 @@ export default function TacticsScreen() {
           {selectionLineups.map(renderGrenadeCard)}
         </View>
         {selectionLineups.length === 0 ? (
-          <Text style={styles.emptyText}>
-            Waiting for the IGL to pick a tactic.
-          </Text>
+          lineupsLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#FF6800" />
+              <Text style={styles.loadingText}>Loading lineups...</Text>
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>
+              Waiting for the IGL to pick a tactic.
+            </Text>
+          )
         ) : null}
       </View>
       {renderError()}
@@ -1072,6 +1116,17 @@ const styles = StyleSheet.create({
   emptyText: {
     color: '#777',
     fontStyle: 'italic',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 10,
+  },
+  loadingText: {
+    color: '#888',
+    fontSize: 14,
   },
   touchableCard: {
     opacity: 0.95,

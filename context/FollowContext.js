@@ -5,11 +5,9 @@ import {
   deleteDoc,
   doc,
   getDocs,
-  increment,
   onSnapshot,
   serverTimestamp,
   setDoc,
-  updateDoc,
 } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { useAuth } from './AuthContext';
@@ -115,28 +113,8 @@ export const FollowProvider = ({ children }) => {
     );
   };
 
-  const bumpRemoteCounts = async (targetUserId, delta) => {
-    if (!currentUser) return;
-    try {
-      const targetRef = doc(db, 'users', targetUserId);
-      await updateDoc(targetRef, {
-        followers: increment(delta),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error('Failed to update target follower count', error);
-    }
-
-    try {
-      const myRef = doc(db, 'users', currentUser.uid);
-      await updateDoc(myRef, {
-        following: increment(delta),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error('Failed to update following count', error);
-    }
-  };
+  // Note: Follower counts are automatically updated by Cloud Functions
+  // when follower documents are added/removed in the subcollection
 
   const upsertFollowerRecord = async (targetUserId) => {
     if (!currentUser?.uid) return;
@@ -187,8 +165,8 @@ export const FollowProvider = ({ children }) => {
       return newFollowing;
     });
 
+    // Cloud Function will automatically update counts when follower record is created
     await upsertFollowerRecord(userId);
-    await bumpRemoteCounts(userId, 1);
   };
 
   const unfollowUser = async (userId, playerID, username) => {
@@ -203,8 +181,8 @@ export const FollowProvider = ({ children }) => {
       return newFollowing;
     });
 
+    // Cloud Function will automatically update counts when follower record is removed
     await removeFollowerRecord(targetKey);
-    await bumpRemoteCounts(targetKey, -1);
   };
 
   const isFollowing = (userId, playerID, username) => {

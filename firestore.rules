@@ -9,21 +9,26 @@ service cloud.firestore {
       // Allow any authenticated user to read public profile data
       allow read: if isSignedIn();
 
-      // Only the owner can create or freely update their profile
+      // Only the owner can create or update their profile
       allow create, update: if isSignedIn() && request.auth.uid == userId;
 
-      // Followers list is managed by followers themselves
+      // Followers subcollection
       match /followers/{followerId} {
-        // Only the profile owner can read their followers
+        // Owner can read their own followers list
         allow read: if isSignedIn() && request.auth.uid == userId;
-        // Only the follower can add/remove their record
-        allow write: if isSignedIn() && request.auth.uid == followerId;
+        // Follower can add/remove themselves from the list
+        allow create, delete: if isSignedIn() && request.auth.uid == followerId;
       }
+    }
 
-      // Allow other authenticated users to bump follower counts safely
-      allow update: if isSignedIn()
-        && request.auth.uid != userId
-        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['followers', 'updatedAt']);
+    // Lineups collection
+    match /lineups/{lineupId} {
+      // Anyone can read lineups
+      allow read: if true;
+      // Only authenticated users can create lineups
+      allow create: if isSignedIn();
+      // Only the creator can update/delete their lineups
+      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.creatorId;
     }
   }
 }

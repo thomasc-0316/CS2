@@ -1,72 +1,72 @@
 export const MAPS = [
-  { 
-    id: 1, 
-    name: 'Dust II', 
-    isLocked: false, 
+  {
+    id: 'dust2',
+    name: 'Dust II',
+    isLocked: false,
     background: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapBackground%2FDe_dust2_background.jpg?alt=media&token=6ed70109-6d36-40a8-b880-68840965a980' },
     icon: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapIcons%2FDe_dust2.png?alt=media&token=9e5d0df5-b501-4e2a-8844-7d584aab969f' },
     isActiveDuty: true,
   },
-  { 
-    id: 2, 
-    name: 'Mirage', 
-    isLocked: false, 
+  {
+    id: 'mirage',
+    name: 'Mirage',
+    isLocked: false,
     background: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapBackground%2FDe_mirage_background.jpg?alt=media&token=8764fd22-e14b-40ed-8b63-a1f542f21912' },
     icon: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapIcons%2FDe_mirage.png?alt=media&token=b7b3c6f7-0cae-4857-b9a0-54eacbd7ef89' },
     isActiveDuty: true,
   },
-  { 
-    id: 3, 
-    name: 'Inferno', 
-    isLocked: true, 
+  {
+    id: 'inferno',
+    name: 'Inferno',
+    isLocked: true,
     background: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapBackground%2FDe_inferno_background.jpg?alt=media&token=ec3d4dc8-c05e-496b-91de-321d015cd2f9' },
     icon: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapIcons%2FDe_inferno.png?alt=media&token=3698e35f-5ade-4442-b1cc-525251b32a62' },
     isActiveDuty: true,
   },
-  { 
-    id: 4, 
-    name: 'Nuke', 
-    isLocked: true, 
+  {
+    id: 'nuke',
+    name: 'Nuke',
+    isLocked: true,
     background: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapBackground%2FDe_nuke_background.jpg?alt=media&token=099d5664-daaa-45fa-bdbf-fb929b5b80f8' },
     icon: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapIcons%2FDe_nuke.png?alt=media&token=6575c560-a49d-40d9-9004-3b9b4b1b00eb' },
     isActiveDuty: true,
   },
-  { 
-    id: 5, 
-    name: 'Overpass', 
-    isLocked: true, 
+  {
+    id: 'overpass',
+    name: 'Overpass',
+    isLocked: true,
     background: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapBackground%2FDe_overpass_background.jpg?alt=media&token=08e8fa57-6b92-4733-b388-945499722879' },
     icon: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapIcons%2FDe_overpass.png?alt=media&token=2280ba95-af03-49bf-bc06-5ece8883540b' },
     isActiveDuty: true,
   },
-  { 
-    id: 6, 
-    name: 'Vertigo', 
-    isLocked: true, 
+  {
+    id: 'vertigo',
+    name: 'Vertigo',
+    isLocked: true,
     background: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapBackground%2FDe_vertigo_background.jpg?alt=media&token=7f9558e6-68cb-4c53-9186-36c71b55b2f3' },
     icon: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapIcons%2FDe_vertigo.png?alt=media&token=f0ae22a9-3387-420b-9d76-c3761c85c2d2' },
     isActiveDuty: false, // NOT Active Duty
   },
-  { 
-    id: 7, 
-    name: 'Ancient', 
-    isLocked: true, 
+  {
+    id: 'ancient',
+    name: 'Ancient',
+    isLocked: true,
     background: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapBackground%2FDe_ancient_background.jpg?alt=media&token=d6f31e00-f3ed-4c77-9828-36758caa4481' },
     icon: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapIcons%2FDe_ancient.png?alt=media&token=ac292f20-1e30-411f-8921-c847da6d5444' },
     isActiveDuty: true,
   },
-  { 
-    id: 8, 
-    name: 'Anubis', 
-    isLocked: true, 
+  {
+    id: 'anubis',
+    name: 'Anubis',
+    isLocked: true,
     background: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapBackground%2FDe_anubis_background.jpg?alt=media&token=f0647dde-4154-40dc-96e0-640dcc9011d5' },
     icon: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapIcons%2FDe_anubis.png?alt=media&token=9de61e8a-0a87-48cc-9a5e-47419bb2653f' },
     isActiveDuty: false, // NOT Active Duty
   },
-  { 
-    id: 9, 
-    name: 'Train', 
-    isLocked: true, 
+  {
+    id: 'train',
+    name: 'Train',
+    isLocked: true,
     background: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapBackground%2FDe_train_background.jpg?alt=media&token=24867c6c-d694-46af-8455-93e51d52b032' },
     icon: { uri: 'https://firebasestorage.googleapis.com/v0/b/cs2-tactics-d229a.firebasestorage.app/o/mapIcons%2FDe_train.png?alt=media&token=953f946f-0a86-4a30-b3d1-8ee6721f325d' },
     isActiveDuty: true,

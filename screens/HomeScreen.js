@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ImageBackground } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ImageBackground, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
-import { LINEUPS } from '../data/lineups';
 import { useFollow } from '../context/FollowContext';
 import CreatorDiscovery from '../components/CreatorDiscovery';
 import LineupCard from '../components/LineupCard';
@@ -10,16 +11,72 @@ import LineupCard from '../components/LineupCard';
 export default function HomeScreen({ navigation }) {
   const [activeTab, setActiveTab] = useState('explore'); // 'explore' or 'following'
   const [filter, setFilter] = useState('all'); // 'all', 'active', 'reserve'
+  const [followingLineups, setFollowingLineups] = useState([]);
+  const [loading, setLoading] = useState(false);
   const { getFollowing } = useFollow();
 
   const followingUsers = getFollowing();
   const followingUserIds = followingUsers.map(user => user.id);
   const isFollowingAnyone = followingUserIds.length > 0;
 
-  // Get lineups from followed creators
-  const followingLineups = LINEUPS.filter(lineup => 
-    followingUserIds.includes(lineup.creatorId)
-  ).sort((a, b) => b.uploadedAt - a.uploadedAt);
+  // Fetch lineups from followed creators
+  useEffect(() => {
+    const fetchFollowingLineups = async () => {
+      if (followingUserIds.length === 0) {
+        setFollowingLineups([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        // Firebase has a limit of 10 items per 'in' query, so we need to batch
+        const batches = [];
+        for (let i = 0; i < followingUserIds.length; i += 10) {
+          const batch = followingUserIds.slice(i, i + 10);
+          batches.push(batch);
+        }
+
+        const allLineups = [];
+        for (const batch of batches) {
+          const q = query(
+            collection(db, 'lineups'),
+            where('creatorId', 'in', batch),
+            where('isPublic', '==', true),
+            orderBy('uploadedAt', 'desc')
+          );
+
+          const snapshot = await getDocs(q);
+          const lineups = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          allLineups.push(...lineups);
+        }
+
+        // Sort all lineups by uploadedAt
+        allLineups.sort((a, b) => {
+          const aDate = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(a.uploadedAt);
+          const bDate = b.uploadedAt?.toDate ? b.uploadedAt.toDate() : new Date(b.uploadedAt);
+          return bDate - aDate;
+        });
+
+        setFollowingLineups(allLineups);
+      } catch (error) {
+        console.error('Error fetching following lineups:', error);
+        if (error.code === 'failed-precondition') {
+          console.log('⚠️ Index required! Click the link in the error to create it.');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (activeTab === 'following') {
+      fetchFollowingLineups();
+    }
+  }, [activeTab, followingUserIds.length]);
 
   // Filter maps based on toggle (for Explore tab)
   const getFilteredMaps = () => {
@@ -82,6 +139,15 @@ export default function HomeScreen({ navigation }) {
       return <CreatorDiscovery navigation={navigation} />;
     }
 
+    if (loading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF6800" />
+          <Text style={styles.loadingText}>Loading lineups...</Text>
+        </View>
+      );
+    }
+
     // Show lineups from followed creators as a grid (like Explore)
     return (
       <View style={styles.followingContentContainer}>
@@ -91,7 +157,7 @@ export default function HomeScreen({ navigation }) {
             Lineups from creators you follow
           </Text>
         </View>
-        
+
         <FlatList
           data={followingLineups}
           renderItem={({ item }) => (
@@ -101,6 +167,15 @@ export default function HomeScreen({ navigation }) {
           numColumns={2}
           contentContainerStyle={styles.lineupGrid}
           columnWrapperStyle={styles.lineupRow}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="albums-outline" size={60} color="#4a4a4a" />
+              <Text style={styles.emptyText}>No lineups yet</Text>
+              <Text style={styles.emptySubtext}>
+                Creators you follow haven't posted any lineups
+              </Text>
+            </View>
+          }
         />
       </View>
     );
@@ -195,6 +270,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1a1a1a',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#888',
+    marginTop: 15,
+    fontSize: 16,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 15,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#555',
+    marginTop: 5,
+    textAlign: 'center',
+    paddingHorizontal: 40,
   },
   topHeader: {
     flexDirection: 'row',

@@ -17,8 +17,10 @@ export default function LineupCard({ lineup, navigation, rankBadge }) {
 
   return (
     <TouchableOpacity
-      style={styles.lineupCard}
-      onPress={() => navigation.navigate('LineupDetail', { lineupId: lineup.id })}
+    style={styles.lineupCard}
+    onPress={() => navigation.navigate('LineupDetail', { 
+        lineup: lineup  // Pass the FULL lineup object with images
+    })}
     >
       <Image
         source={typeof lineup.landImage === 'string' ? { uri: lineup.landImage } : lineup.landImage}

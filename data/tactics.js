@@ -1,7 +1,7 @@
 export const TACTICS = [
   {
     id: 'dust2_default_a_split',
-    mapId: 1,
+    mapId: 'dust2',
     side: 'T',
     category: 'default',
     title: 'Dust II - A Split Default',
@@ -10,7 +10,7 @@ export const TACTICS = [
   },
   {
     id: 'dust2_fast_b',
-    mapId: 1,
+    mapId: 'dust2',
     side: 'T',
     category: 'default',
     title: 'Dust II - Fast B Hit',
@@ -19,7 +19,7 @@ export const TACTICS = [
   },
   {
     id: 'dust2_ct_long_lock',
-    mapId: 1,
+    mapId: 'dust2',
     side: 'CT',
     category: 'default',
     title: 'Dust II - Long Lockdown',
@@ -28,7 +28,7 @@ export const TACTICS = [
   },
   {
     id: 'dust2_mid_b_contact',
-    mapId: 1,
+    mapId: 'dust2',
     side: 'T',
     category: 'personal',
     title: 'Dust II - Mid to B Contact',
@@ -37,7 +37,7 @@ export const TACTICS = [
   },
   {
     id: 'mirage_a_exec',
-    mapId: 2,
+    mapId: 'mirage',
     side: 'T',
     category: 'default',
     title: 'Mirage - Full A Execute',
@@ -46,7 +46,7 @@ export const TACTICS = [
   },
   {
     id: 'mirage_mid_default',
-    mapId: 2,
+    mapId: 'mirage',
     side: 'T',
     category: 'personal',
     title: 'Mirage - Mid Default',

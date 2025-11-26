@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Animated, RefreshControl } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Animated, RefreshControl, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LINEUPS } from '../data/lineups';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
 import { useUpvotes } from '../context/UpvoteContext';
 import LineupCard from '../components/LineupCard';
@@ -11,6 +12,8 @@ export default function HotScreen({ navigation }) {
   const [filterVisible, setFilterVisible] = useState(false);
   const [slideAnim] = useState(new Animated.Value(300));
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [allLineups, setAllLineups] = useState([]);
   const { getUpvoteCount } = useUpvotes();
 
   // Multi-select filters
@@ -23,20 +26,61 @@ export default function HotScreen({ navigation }) {
   const [tempSites, setTempSites] = useState([]);
   const [tempNadeTypes, setTempNadeTypes] = useState([]);
 
+  // Fetch all lineups from Firebase
+  useEffect(() => {
+    fetchLineups();
+  }, []);
+
+  const fetchLineups = async () => {
+    try {
+      setLoading(true);
+
+      const q = query(
+        collection(db, 'lineups'),
+        where('isPublic', '==', true),
+        orderBy('uploadedAt', 'desc')
+      );
+
+      const snapshot = await getDocs(q);
+      const lineups = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      setAllLineups(lineups);
+    } catch (error) {
+      console.error('Error fetching lineups:', error);
+      if (error.code === 'failed-precondition') {
+        console.log('⚠️ Index required! Click the link in the error to create it.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getFilteredLineups = () => {
-    let lineups = [...LINEUPS];
+    let lineups = [...allLineups];
 
     // Time filter
     const now = new Date();
     if (timeFilter === 'today') {
       const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      lineups = lineups.filter(lineup => lineup.uploadedAt >= dayAgo);
+      lineups = lineups.filter(lineup => {
+        const uploadedAt = lineup.uploadedAt?.toDate ? lineup.uploadedAt.toDate() : new Date(lineup.uploadedAt);
+        return uploadedAt >= dayAgo;
+      });
     } else if (timeFilter === 'week') {
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      lineups = lineups.filter(lineup => lineup.uploadedAt >= weekAgo);
+      lineups = lineups.filter(lineup => {
+        const uploadedAt = lineup.uploadedAt?.toDate ? lineup.uploadedAt.toDate() : new Date(lineup.uploadedAt);
+        return uploadedAt >= weekAgo;
+      });
     } else if (timeFilter === 'month') {
       const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      lineups = lineups.filter(lineup => lineup.uploadedAt >= monthAgo);
+      lineups = lineups.filter(lineup => {
+        const uploadedAt = lineup.uploadedAt?.toDate ? lineup.uploadedAt.toDate() : new Date(lineup.uploadedAt);
+        return uploadedAt >= monthAgo;
+      });
     }
 
     // Apply multi-select filters
@@ -57,9 +101,10 @@ export default function HotScreen({ navigation }) {
 
   const hotLineups = getFilteredLineups();
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1000);
+    await fetchLineups();
+    setRefreshing(false);
   };
 
   const openFilter = () => {
@@ -121,6 +166,16 @@ export default function HotScreen({ navigation }) {
   };
 
   const activeFilterCount = selectedSides.length + selectedSites.length + selectedNadeTypes.length;
+
+  // Show loading spinner on first load
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF6800" />
+        <Text style={styles.loadingText}>Loading lineups...</Text>
+      </View>
+    );
+  }
 
   const getRankBadgeColor = (index) => {
     if (index === 0) return '#FFD700'; // Gold
@@ -283,6 +338,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1a1a1a',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+  },
+  loadingText: {
+    color: '#888',
+    marginTop: 15,
+    fontSize: 16,
   },
   timeFilterContainer: {
     flexDirection: 'row',

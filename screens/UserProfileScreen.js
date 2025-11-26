@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useFollow } from '../context/FollowContext';
-import { LINEUPS } from '../data/lineups';
 import { MAPS } from '../data/maps';
-import { getUserById } from '../data/users';
 import { useAuth } from '../context/AuthContext';
 
 // Lineup card component
@@ -70,13 +70,14 @@ export default function UserProfileScreen({ route }) {
   const [followLoading, setFollowLoading] = useState(false);
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
+  const [userLineups, setUserLineups] = useState([]);
+  const [loadingLineups, setLoadingLineups] = useState(true);
 
   const loadUser = async () => {
     try {
       setLoadingUser(true);
       const liveUser = await getUserProfile(userId);
-      const fallbackUser = getUserById(userId);
-      setUser(liveUser || fallbackUser || null);
+      setUser(liveUser || null);
     } finally {
       setLoadingUser(false);
     }
@@ -85,6 +86,34 @@ export default function UserProfileScreen({ route }) {
   useEffect(() => {
     loadUser();
   }, [userId]);
+
+  // Load user's lineups from Firebase
+  useEffect(() => {
+    const loadLineups = async () => {
+      if (!userId) return;
+      try {
+        setLoadingLineups(true);
+        const lineupsQuery = query(
+          collection(db, 'lineups'),
+          where('creatorId', '==', userId),
+          orderBy('createdAt', 'desc')
+        );
+        const querySnapshot = await getDocs(lineupsQuery);
+        const lineups = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setUserLineups(lineups);
+      } catch (error) {
+        console.error('Failed to load user lineups:', error);
+        setUserLineups([]);
+      } finally {
+        setLoadingLineups(false);
+      }
+    };
+    loadLineups();
+  }, [userId]);
+
   const isFollowingUser = user ? isFollowing(user.id, user.playerID, user.username) : false;
   const isOwnProfile = currentUser?.uid === userId;
 
@@ -93,9 +122,6 @@ export default function UserProfileScreen({ route }) {
   const dynamicFollowerCount = baseFollowerCount > 0
     ? baseFollowerCount
     : (isFollowingUser ? 1 : 0);
-
-  // Get user's lineups
-  const userLineups = LINEUPS.filter(lineup => lineup.creatorId === userId);
 
   // Calculate total upvotes received on user's posts
   const totalUpvotesReceived = userLineups.reduce((total, lineup) => {
@@ -223,19 +249,54 @@ export default function UserProfileScreen({ route }) {
     />
   );
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Ionicons name="cloud-upload-outline" size={80} color="#4a4a4a" />
-      <Text style={styles.emptyText}>No lineups posted yet</Text>
-    </View>
-  );
+  const renderEmptyState = () => {
+    if (loadingLineups) {
+      return (
+        <View style={styles.emptyState}>
+          <ActivityIndicator size="large" color="#FF6800" />
+          <Text style={styles.loadingText}>Loading lineups...</Text>
+        </View>
+      );
+    }
 
-  const onRefresh = () => {
+    return (
+      <View style={styles.emptyState}>
+        <Ionicons name="cloud-upload-outline" size={80} color="#4a4a4a" />
+        <Text style={styles.emptyText}>No lineups posted yet</Text>
+      </View>
+    );
+  };
+
+  const onRefresh = async () => {
     setRefreshing(true);
-    // Simulate refresh - in a real app, you'd refetch data here
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+    await loadUser();
+
+    // Refetch lineups
+    try {
+      const q = query(
+        collection(db, 'lineups'),
+        where('creatorId', '==', userId),
+        where('isPublic', '==', true),
+        orderBy('uploadedAt', 'desc')
+      );
+
+      const snapshot = await getDocs(q);
+      const lineups = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      setUserLineups(lineups);
+    } catch (error) {
+      console.error('Error refreshing lineups:', error);
+      Alert.alert(
+        'Refresh Failed',
+        'Could not refresh lineups. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
+
+    setRefreshing(false);
   };
 
   if (loadingUser) {
@@ -490,6 +551,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
     lineHeight: 24,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+    marginTop: 15,
   },
   errorState: {
     flex: 1,
