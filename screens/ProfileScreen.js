@@ -71,7 +71,7 @@ function LineupCard({ item, navigation, getMapName, getUpvoteCount }) {
   return (
     <TouchableOpacity
       style={styles.lineupCard}
-      onPress={() => navigation.navigate('LineupDetail', { lineup: item })}
+      onPress={() => navigation.navigate('LineupDetail', { lineupId: item.id })}
     >
       <Image
         source={typeof item.landImage === 'string' ? { uri: item.landImage } : item.landImage}
