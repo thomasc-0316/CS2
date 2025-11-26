@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { Image } from 'expo-image';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
@@ -83,26 +83,49 @@ export default function UserProfileScreen({ route }) {
     }
   };
 
-  useEffect(() => {
-    loadUser();
-  }, [userId]);
-
-  // Load user's lineups from Firebase
-  useEffect(() => {
-    const loadLineups = async () => {
+  const loadLineups = useCallback(
+    async (profile) => {
       if (!userId) return;
       try {
         setLoadingLineups(true);
-        const lineupsQuery = query(
-          collection(db, 'lineups'),
-          where('creatorId', '==', userId),
-          orderBy('createdAt', 'desc')
-        );
-        const querySnapshot = await getDocs(lineupsQuery);
-        const lineups = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        let lineups = [];
+
+        // Primary query by creatorId (Firebase UID)
+        try {
+          const lineupsQuery = query(
+            collection(db, 'lineups'),
+            where('creatorId', '==', userId),
+            where('isPublic', '==', true),
+            orderBy('uploadedAt', 'desc')
+          );
+          const querySnapshot = await getDocs(lineupsQuery);
+          lineups = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+        } catch (error) {
+          console.error('Failed to load lineups by creatorId:', error);
+        }
+
+        // Fallback by playerID if provided and no results yet
+        if ((!lineups || lineups.length === 0) && profile?.playerID) {
+          try {
+            const lineupsQuery = query(
+              collection(db, 'lineups'),
+              where('creatorPlayerId', '==', profile.playerID),
+              where('isPublic', '==', true),
+              orderBy('uploadedAt', 'desc')
+            );
+            const querySnapshot = await getDocs(lineupsQuery);
+            lineups = querySnapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+          } catch (error) {
+            console.error('Failed to load lineups by playerID:', error);
+          }
+        }
+
         setUserLineups(lineups);
       } catch (error) {
         console.error('Failed to load user lineups:', error);
@@ -110,9 +133,25 @@ export default function UserProfileScreen({ route }) {
       } finally {
         setLoadingLineups(false);
       }
-    };
-    loadLineups();
+    },
+    [userId]
+  );
+
+  useEffect(() => {
+    loadUser();
   }, [userId]);
+
+  // Load user's lineups from Firebase
+  useEffect(() => {
+    loadLineups(user);
+  }, [userId, user, loadLineups]);
+
+  // Refresh lineups when screen gains focus (captures new posts)
+  useFocusEffect(
+    useCallback(() => {
+      loadLineups(user);
+    }, [loadLineups, user])
+  );
 
   const isFollowingUser = user ? isFollowing(user.id, user.playerID, user.username) : false;
   const isOwnProfile = currentUser?.uid === userId;
@@ -269,33 +308,9 @@ export default function UserProfileScreen({ route }) {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadUser();
-
-    // Refetch lineups
-    try {
-      const q = query(
-        collection(db, 'lineups'),
-        where('creatorId', '==', userId),
-        where('isPublic', '==', true),
-        orderBy('uploadedAt', 'desc')
-      );
-
-      const snapshot = await getDocs(q);
-      const lineups = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      setUserLineups(lineups);
-    } catch (error) {
-      console.error('Error refreshing lineups:', error);
-      Alert.alert(
-        'Refresh Failed',
-        'Could not refresh lineups. Please try again.',
-        [{ text: 'OK' }]
-      );
-    }
-
+    const freshProfile = await getUserProfile(userId);
+    setUser(freshProfile || null);
+    await loadLineups(freshProfile || user);
     setRefreshing(false);
   };
 

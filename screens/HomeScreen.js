@@ -1,22 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ImageBackground, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ImageBackground, ActivityIndicator, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
 import { useFollow } from '../context/FollowContext';
+import { useUpvotes } from '../context/UpvoteContext';
 import CreatorDiscovery from '../components/CreatorDiscovery';
 import LineupCard from '../components/LineupCard';
 
 export default function HomeScreen({ navigation }) {
   const [activeTab, setActiveTab] = useState('explore'); // 'explore' or 'following'
   const [filter, setFilter] = useState('all'); // 'all', 'active', 'reserve'
+  const [followingFilters, setFollowingFilters] = useState({
+    map: 'all',
+    type: 'all',
+    side: 'all',
+  });
+  const [sortBy, setSortBy] = useState('hybrid'); // 'hybrid' | 'newest' | 'likes'
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [slideAnim] = useState(new Animated.Value(400));
+  const [tempFilters, setTempFilters] = useState(followingFilters);
   const [followingLineups, setFollowingLineups] = useState([]);
   const [loading, setLoading] = useState(false);
   const { getFollowing } = useFollow();
+  const { getUpvoteCount } = useUpvotes();
 
   const followingUsers = getFollowing();
   const followingUserIds = followingUsers.map(user => user.id);
+  const followingPlayerIds = followingUsers.map(user => user.playerID).filter(Boolean);
   const isFollowingAnyone = followingUserIds.length > 0;
 
   // Fetch lineups from followed creators
@@ -38,7 +50,7 @@ export default function HomeScreen({ navigation }) {
           batches.push(batch);
         }
 
-        const allLineups = [];
+        const allLineupsMap = new Map();
         for (const batch of batches) {
           const q = query(
             collection(db, 'lineups'),
@@ -52,10 +64,33 @@ export default function HomeScreen({ navigation }) {
             id: doc.id,
             ...doc.data()
           }));
-          allLineups.push(...lineups);
+          lineups.forEach((l) => allLineupsMap.set(l.id, l));
+        }
+
+        // Fallback queries by playerID if provided
+        if (followingPlayerIds.length) {
+          for (let i = 0; i < followingPlayerIds.length; i += 10) {
+            const batch = followingPlayerIds.slice(i, i + 10);
+            try {
+              const q = query(
+                collection(db, 'lineups'),
+                where('creatorPlayerId', 'in', batch),
+                where('isPublic', '==', true)
+              );
+              const snapshot = await getDocs(q);
+              const lineups = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+              }));
+              lineups.forEach((l) => allLineupsMap.set(l.id, l));
+            } catch (err) {
+              console.error('Error fetching by playerID batch:', err);
+            }
+          }
         }
 
         // Sort all lineups by uploadedAt
+        const allLineups = Array.from(allLineupsMap.values());
         allLineups.sort((a, b) => {
           const aDate = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(a.uploadedAt);
           const bDate = b.uploadedAt?.toDate ? b.uploadedAt.toDate() : new Date(b.uploadedAt);
@@ -77,6 +112,74 @@ export default function HomeScreen({ navigation }) {
       fetchFollowingLineups();
     }
   }, [activeTab, followingUserIds.length]);
+
+  // Filters for following feed
+  const availableMaps = useMemo(
+    () => ['all', ...MAPS.map((m) => m.id)],
+    []
+  );
+  const availableSides = useMemo(() => ['all', 't', 'ct'], []);
+  const availableTypes = useMemo(() => {
+    const set = new Set();
+    followingLineups.forEach((l) => {
+      if (l.nadeType) {
+        set.add((l.nadeType || '').toLowerCase());
+      }
+    });
+    // Ensure HE is present as an option
+    set.add('he');
+    return ['all', ...Array.from(set)];
+  }, [followingLineups]);
+
+  const filteredFollowingLineups = useMemo(() => {
+    return followingLineups.filter((lineup) => {
+      const mapMatch =
+        followingFilters.map === 'all' ||
+        lineup.mapId === followingFilters.map;
+      const typeMatch =
+        followingFilters.type === 'all' ||
+        (lineup.nadeType || '').toLowerCase() === followingFilters.type;
+      const sideMatch =
+        followingFilters.side === 'all' ||
+        (lineup.side || '').toLowerCase() === followingFilters.side;
+      return mapMatch && typeMatch && sideMatch;
+    });
+  }, [followingLineups, followingFilters]);
+
+  const sortedFollowingLineups = useMemo(() => {
+    const items = [...filteredFollowingLineups];
+    const now = Date.now();
+
+    // Defaults for score-based sorting
+    const b = 2;
+    const c = 2;
+    const alpha = 0.8;
+
+    items.sort((a, bLineup) => {
+      const aDate = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(a.uploadedAt);
+      const bDate = bLineup.uploadedAt?.toDate ? bLineup.uploadedAt.toDate() : new Date(bLineup.uploadedAt);
+      const aVotes = getUpvoteCount(a) || 0;
+      const bVotes = getUpvoteCount(bLineup) || 0;
+
+      if (sortBy === 'likes') {
+        if (bVotes === aVotes) return bDate - aDate;
+        return bVotes - aVotes;
+      }
+
+      if (sortBy === 'newest') {
+        return bDate - aDate;
+      }
+
+      // Default: score-based hybrid
+      const aAgeHours = Math.max(0, (now - aDate.getTime()) / 3600000);
+      const bAgeHours = Math.max(0, (now - bDate.getTime()) / 3600000);
+      const aScore = (aVotes + b) / Math.pow(aAgeHours + c, alpha);
+      const bScore = (bVotes + b) / Math.pow(bAgeHours + c, alpha);
+      return bScore - aScore;
+    });
+
+    return items;
+  }, [filteredFollowingLineups, sortBy, getUpvoteCount]);
 
   // Filter maps based on toggle (for Explore tab)
   const getFilteredMaps = () => {
@@ -158,25 +261,348 @@ export default function HomeScreen({ navigation }) {
           </Text>
         </View>
 
-        <FlatList
-          data={followingLineups}
-          renderItem={({ item }) => (
-            <LineupCard lineup={item} navigation={navigation} />
-          )}
-          keyExtractor={(item) => item.id.toString()}
-          numColumns={2}
-          contentContainerStyle={styles.lineupGrid}
-          columnWrapperStyle={styles.lineupRow}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="albums-outline" size={60} color="#4a4a4a" />
-              <Text style={styles.emptyText}>No lineups yet</Text>
-              <Text style={styles.emptySubtext}>
-                Creators you follow haven't posted any lineups
-              </Text>
+        <View style={styles.sortRow}>
+          <TouchableOpacity
+            style={[styles.sortButton, sortBy === 'hybrid' && styles.sortButtonActive]}
+            onPress={() => setSortBy('hybrid')}
+          >
+            <Text style={[styles.sortText, sortBy === 'hybrid' && styles.sortTextActive]}>Default</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.sortButton, sortBy === 'newest' && styles.sortButtonActive]}
+            onPress={() => setSortBy('newest')}
+          >
+            <Text style={[styles.sortText, sortBy === 'newest' && styles.sortTextActive]}>Newest</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.sortButton, sortBy === 'likes' && styles.sortButtonActive]}
+            onPress={() => setSortBy('likes')}
+          >
+            <Text style={[styles.sortText, sortBy === 'likes' && styles.sortTextActive]}>Most Likes</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={styles.filterToggle}
+          onPress={() => {
+            setTempFilters(followingFilters);
+            setFilterVisible(true);
+            Animated.timing(slideAnim, {
+              toValue: 0,
+              duration: 250,
+              useNativeDriver: true,
+            }).start();
+          }}
+        >
+          <Text style={styles.filterToggleText}>Filters</Text>
+          <Ionicons name="options" size={18} color="#fff" />
+        </TouchableOpacity>
+
+        {filterVisible && (
+          <View style={styles.filterPortal} pointerEvents="box-none">
+            <TouchableOpacity
+              style={styles.overlay}
+              activeOpacity={1}
+              onPress={() => {
+                Animated.timing(slideAnim, {
+                  toValue: 400,
+                  duration: 250,
+                  useNativeDriver: true,
+                }).start(() => setFilterVisible(false));
+              }}
+            />
+            <Animated.View
+              style={[
+                styles.filterPanel,
+                { transform: [{ translateY: slideAnim }] },
+              ]}
+            >
+              <View style={styles.filterHeaderRow}>
+                <Text style={styles.filterPanelTitle}>Filters</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    Animated.timing(slideAnim, {
+                      toValue: 400,
+                      duration: 250,
+                      useNativeDriver: true,
+                    }).start(() => setFilterVisible(false));
+                  }}
+                >
+                  <Ionicons name="close" size={22} color="#fff" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.filterRow}>
+                <Text style={styles.filterLabel}>Map</Text>
+                <View style={styles.chipRow}>
+                  {availableMaps.map((id) => (
+                    <TouchableOpacity
+                      key={id}
+                      style={[
+                        styles.chip,
+                        tempFilters.map === id && styles.chipActive,
+                      ]}
+                      onPress={() =>
+                        setTempFilters((prev) => ({ ...prev, map: id }))
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          tempFilters.map === id && styles.chipTextActive,
+                        ]}
+                      >
+                        {id === 'all'
+                          ? 'All'
+                          : MAPS.find((m) => m.id === id)?.name || id}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.filterRow}>
+                <Text style={styles.filterLabel}>Type</Text>
+                <View style={styles.chipRow}>
+                  {availableTypes.map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[
+                        styles.chip,
+                        tempFilters.type === type && styles.chipActive,
+                      ]}
+                      onPress={() =>
+                        setTempFilters((prev) => ({ ...prev, type }))
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          tempFilters.type === type && styles.chipTextActive,
+                        ]}
+                      >
+                        {type === 'all' ? 'All' : type}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.filterRow}>
+                <Text style={styles.filterLabel}>Side</Text>
+                <View style={styles.chipRow}>
+                  {availableSides.map((side) => (
+                    <TouchableOpacity
+                      key={side}
+                      style={[
+                        styles.chip,
+                        tempFilters.side === side && styles.chipActive,
+                      ]}
+                      onPress={() =>
+                        setTempFilters((prev) => ({ ...prev, side }))
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          tempFilters.side === side && styles.chipTextActive,
+                        ]}
+                      >
+                        {side === 'all' ? 'All' : side.toUpperCase()}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.filterActions}>
+                <TouchableOpacity
+                  style={styles.clearButton}
+                  onPress={() => setTempFilters({ map: 'all', type: 'all', side: 'all' })}
+                >
+                  <Text style={styles.clearButtonText}>Reset</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.applyButton}
+                  onPress={() => {
+                    setFollowingFilters(tempFilters);
+                    Animated.timing(slideAnim, {
+                      toValue: 400,
+                      duration: 250,
+                      useNativeDriver: true,
+                    }).start(() => setFilterVisible(false));
+                  }}
+                >
+                  <Text style={styles.applyButtonText}>Apply</Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          </View>
+        )}
+
+        <View style={{ flex: 1 }}>
+          <FlatList
+            data={sortedFollowingLineups}
+            renderItem={({ item }) => (
+              <LineupCard lineup={item} navigation={navigation} />
+            )}
+            keyExtractor={(item) => item.id.toString()}
+            numColumns={2}
+            contentContainerStyle={styles.lineupGrid}
+            columnWrapperStyle={styles.lineupRow}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Ionicons name="albums-outline" size={60} color="#4a4a4a" />
+                <Text style={styles.emptyText}>No lineups yet</Text>
+                <Text style={styles.emptySubtext}>
+                  Creators you follow haven't posted any lineups
+                </Text>
+              </View>
+            }
+          />
+
+          {filterVisible && (
+            <View style={styles.filterPortal} pointerEvents="box-none">
+              <TouchableOpacity
+                style={styles.overlay}
+                activeOpacity={1}
+                onPress={() => {
+                  Animated.timing(slideAnim, {
+                    toValue: 400,
+                    duration: 250,
+                    useNativeDriver: true,
+                  }).start(() => setFilterVisible(false));
+                }}
+              />
+              <Animated.View
+                style={[
+                  styles.filterPanel,
+                  { transform: [{ translateY: slideAnim }] },
+                ]}
+              >
+                <View style={styles.filterHeaderRow}>
+                  <Text style={styles.filterPanelTitle}>Filters</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      Animated.timing(slideAnim, {
+                        toValue: 400,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => setFilterVisible(false));
+                    }}
+                  >
+                    <Ionicons name="close" size={22} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.filterRow}>
+                  <Text style={styles.filterLabel}>Map</Text>
+                  <View style={styles.chipRow}>
+                    {availableMaps.map((id) => (
+                      <TouchableOpacity
+                        key={id}
+                        style={[
+                          styles.chip,
+                          tempFilters.map === id && styles.chipActive,
+                        ]}
+                        onPress={() =>
+                          setTempFilters((prev) => ({ ...prev, map: id }))
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            tempFilters.map === id && styles.chipTextActive,
+                          ]}
+                        >
+                          {id === 'all'
+                            ? 'All'
+                            : MAPS.find((m) => m.id === id)?.name || id}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.filterRow}>
+                  <Text style={styles.filterLabel}>Type</Text>
+                  <View style={styles.chipRow}>
+                    {availableTypes.map((type) => (
+                      <TouchableOpacity
+                        key={type}
+                        style={[
+                          styles.chip,
+                          tempFilters.type === type && styles.chipActive,
+                        ]}
+                        onPress={() =>
+                          setTempFilters((prev) => ({ ...prev, type }))
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            tempFilters.type === type && styles.chipTextActive,
+                          ]}
+                        >
+                          {type === 'all' ? 'All' : type}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.filterRow}>
+                  <Text style={styles.filterLabel}>Side</Text>
+                  <View style={styles.chipRow}>
+                    {availableSides.map((side) => (
+                      <TouchableOpacity
+                        key={side}
+                        style={[
+                          styles.chip,
+                          tempFilters.side === side && styles.chipActive,
+                        ]}
+                        onPress={() =>
+                          setTempFilters((prev) => ({ ...prev, side }))
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            tempFilters.side === side && styles.chipTextActive,
+                          ]}
+                        >
+                          {side === 'all' ? 'All' : side.toUpperCase()}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.filterActions}>
+                  <TouchableOpacity
+                    style={styles.clearButton}
+                    onPress={() => setTempFilters({ map: 'all', type: 'all', side: 'all' })}
+                  >
+                    <Text style={styles.clearButtonText}>Reset</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.applyButton}
+                    onPress={() => {
+                      setFollowingFilters(tempFilters);
+                      Animated.timing(slideAnim, {
+                        toValue: 400,
+                        duration: 250,
+                        useNativeDriver: true,
+                      }).start(() => setFilterVisible(false));
+                    }}
+                  >
+                    <Text style={styles.applyButtonText}>Apply</Text>
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
             </View>
-          }
-        />
+          )}
+        </View>
       </View>
     );
   };
@@ -445,5 +871,151 @@ const styles = StyleSheet.create({
   lineupRow: {
     justifyContent: 'space-between',
     paddingHorizontal: 5,
+  },
+  sortRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    paddingHorizontal: 15,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  sortButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#444',
+    backgroundColor: '#1f1f1f',
+  },
+  sortButtonActive: {
+    borderColor: '#FF6800',
+    backgroundColor: '#2a1a10',
+  },
+  sortText: {
+    color: '#aaa',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sortTextActive: {
+    color: '#fff',
+  },
+  filterSection: {
+    paddingHorizontal: 15,
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  filterSectionTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  filterRow: {
+    marginBottom: 10,
+  },
+  filterLabel: {
+    color: '#aaa',
+    fontSize: 13,
+    marginBottom: 6,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+    backgroundColor: '#1a1a1a',
+  },
+  chipActive: {
+    borderColor: '#FF6800',
+    backgroundColor: '#2a1a10',
+  },
+  chipText: {
+    color: '#999',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chipTextActive: {
+    color: '#fff',
+  },
+  filterToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#1f1f1f',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#2a2a2a',
+  },
+  filterToggleText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  filterPortal: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  filterPanel: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#1a1a1a',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    paddingBottom: 24,
+  },
+  filterHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  filterPanelTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  filterActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+  },
+  clearButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#444',
+    backgroundColor: '#222',
+  },
+  clearButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  applyButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    backgroundColor: '#FF6800',
+  },
+  applyButtonText: {
+    color: '#fff',
+    fontWeight: '700',
   },
 });
