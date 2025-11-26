@@ -1,6 +1,7 @@
 const {onDocumentCreated, onDocumentDeleted} = require("firebase-functions/v2/firestore");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {initializeApp} = require("firebase-admin/app");
-const {getFirestore, FieldValue} = require("firebase-admin/firestore");
+const {getFirestore, FieldValue, Timestamp} = require("firebase-admin/firestore");
 
 initializeApp();
 const db = getFirestore();
@@ -31,6 +32,31 @@ exports.onFollowerAdded = onDocumentCreated(
       }
     }
 );
+
+// Daily cleanup of old rooms at 07:00 UTC
+exports.cleanupRooms = onSchedule("0 7 * * *", async () => {
+  const db = getFirestore();
+  // Remove rooms older than 24 hours
+  const cutoff = Timestamp.fromDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
+
+  try {
+    const snapshot = await db.collection("rooms")
+        .where("createdAt", "<", cutoff)
+        .get();
+
+    if (snapshot.empty) {
+      console.log("No rooms to clean up");
+      return;
+    }
+
+    const batch = db.batch();
+    snapshot.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+    console.log(`Cleaned up ${snapshot.size} old rooms`);
+  } catch (error) {
+    console.error("Failed to clean up rooms:", error);
+  }
+});
 
 // Decrement follower count when someone unfollows a user
 exports.onFollowerRemoved = onDocumentDeleted(

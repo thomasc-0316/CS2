@@ -169,13 +169,18 @@ export default function ProfileScreen() {
           const q = query(
             collection(db, 'lineups'),
             where('creatorId', '==', currentUser.uid),
-            orderBy('uploadedAt', 'desc')
+            where('isPublic', '==', true)
           );
           const snapshot = await getDocs(q);
           const lineups = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           }));
+          lineups.sort((a, b) => {
+            const aDate = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(a.uploadedAt);
+            const bDate = b.uploadedAt?.toDate ? b.uploadedAt.toDate() : new Date(b.uploadedAt);
+            return bDate - aDate;
+          });
           setMyLineups(lineups);
         } catch (error) {
           console.error('Error fetching lineups:', error);
@@ -515,13 +520,18 @@ export default function ProfileScreen() {
         const q = query(
           collection(db, 'lineups'),
           where('creatorId', '==', currentUser.uid),
-          orderBy('uploadedAt', 'desc')
+          where('isPublic', '==', true)
         );
         const snapshot = await getDocs(q);
         const lineups = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
+        lineups.sort((a, b) => {
+          const aDate = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(a.uploadedAt);
+          const bDate = b.uploadedAt?.toDate ? b.uploadedAt.toDate() : new Date(b.uploadedAt);
+          return bDate - aDate;
+        });
         setMyLineups(lineups);
       } catch (error) {
         console.error('Error refreshing lineups:', error);

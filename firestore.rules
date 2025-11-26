@@ -30,5 +30,10 @@ service cloud.firestore {
       // Only the creator can update/delete their lineups
       allow update, delete: if isSignedIn() && request.auth.uid == resource.data.creatorId;
     }
+
+    // Rooms collection for tactics
+    match /rooms/{roomId} {
+      allow read, write: if isSignedIn();
+    }
   }
 }
