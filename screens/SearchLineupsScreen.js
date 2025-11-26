@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,13 @@ import {
   Image,
   TextInput,
   SafeAreaView,
-  RefreshControl
+  RefreshControl,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LINEUPS } from '../data/lineups';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useFavorites } from '../context/FavoritesContext';
@@ -19,6 +22,8 @@ import { useFavorites } from '../context/FavoritesContext';
 export default function SearchLineupsScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [userLineups, setUserLineups] = useState([]);
   const { getUpvoteCount } = useUpvotes();
   const { getFavorites } = useFavorites();
 
@@ -26,12 +31,62 @@ export default function SearchLineupsScreen({ navigation }) {
   const favoriteIds = getFavorites();
   const myLineupIds = []; // User hasn't posted any yet
   const upvotedIds = []; // We'll implement this later
-  
+
   // Combine all user's lineup IDs
   const userLineupIds = [...new Set([...myLineupIds, ...favoriteIds, ...upvotedIds])];
-  
-  // Filter to only show user's lineups
-  const userLineups = LINEUPS.filter(lineup => userLineupIds.includes(lineup.id));
+
+  // Fetch user's lineups from Firebase
+  useEffect(() => {
+    fetchUserLineups();
+  }, [favoriteIds.length]);
+
+  const fetchUserLineups = async () => {
+    if (userLineupIds.length === 0) {
+      setUserLineups([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Convert IDs to strings (Firebase document IDs are always strings)
+      const stringIds = userLineupIds.map(id => id.toString());
+
+      // Firebase has a limit of 10 items per 'in' query, so we need to batch
+      const batches = [];
+      for (let i = 0; i < stringIds.length; i += 10) {
+        const batch = stringIds.slice(i, i + 10);
+        batches.push(batch);
+      }
+
+      const allLineups = [];
+      for (const batch of batches) {
+        const q = query(
+          collection(db, 'lineups'),
+          where('__name__', 'in', batch)
+        );
+
+        const snapshot = await getDocs(q);
+        const lineups = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        allLineups.push(...lineups);
+      }
+
+      setUserLineups(allLineups);
+    } catch (error) {
+      console.error('Error fetching user lineups:', error);
+      Alert.alert(
+        'Failed to Load Lineups',
+        'Could not load your saved lineups. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getMapName = (mapId) => {
     const map = MAPS.find(m => m.id === mapId);
@@ -89,13 +144,23 @@ export default function SearchLineupsScreen({ navigation }) {
     </View>
   );
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    // Simulate refresh - in a real app, you'd refetch data here
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+    await fetchUserLineups();
+    setRefreshing(false);
   };
+
+  // Show loading spinner on first load
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF6800" />
+          <Text style={styles.loadingText}>Loading lineups...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -161,6 +226,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1a1a1a',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#888',
+    marginTop: 15,
+    fontSize: 16,
   },
   topHeader: {
     flexDirection: 'row',

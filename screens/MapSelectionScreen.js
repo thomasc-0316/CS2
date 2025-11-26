@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Platform, Animated, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { LINEUPS } from '../data/lineups';
+import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
 import { useFollow } from '../context/FollowContext';
 import { useUpvotes } from '../context/UpvoteContext';
@@ -57,6 +58,8 @@ export default function MapSelectionScreen({ navigation }) {
   const [filterVisible, setFilterVisible] = useState(false);
   const [slideAnim] = useState(new Animated.Value(300));
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [allLineups, setAllLineups] = useState([]);
   const { getFollowing } = useFollow();
   const { getUpvoteCount } = useUpvotes();
 
@@ -70,20 +73,48 @@ export default function MapSelectionScreen({ navigation }) {
   const [tempSites, setTempSites] = useState([]);
   const [tempNadeTypes, setTempNadeTypes] = useState([]);
 
+  // Fetch all lineups from Firebase
+  useEffect(() => {
+    fetchLineups();
+  }, []);
+
+  const fetchLineups = async () => {
+    try {
+      setLoading(true);
+
+      const q = query(
+        collection(db, 'lineups'),
+        where('isPublic', '==', true),
+        orderBy('uploadedAt', 'desc')
+      );
+
+      const snapshot = await getDocs(q);
+      const lineups = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      setAllLineups(lineups);
+    } catch (error) {
+      console.error('Error fetching lineups:', error);
+      if (error.code === 'failed-precondition') {
+        console.log('⚠️ Index required! Click the link in the error to create it.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Get IDs of users we're following
   const followingUsers = getFollowing();
   const followingUserIds = followingUsers.map(user => user.id);
 
   // Filter lineups based on category and search
   const getFilteredLineups = () => {
-    let lineups = LINEUPS;
+    let lineups = [...allLineups];
 
     // Filter by category
     if (category === 'following') {
-      // Only show lineups from creators we follow
-      // For now, we'll check if the lineup has a creatorId field
-      // Since lineups don't have creatorId yet, this will be empty
-      // We'll need to add creatorId to lineups or use another way to identify creators
       lineups = lineups.filter(lineup =>
         lineup.creatorId && followingUserIds.includes(lineup.creatorId)
       );
@@ -109,8 +140,12 @@ export default function MapSelectionScreen({ navigation }) {
       return true;
     });
 
-    // Sort by most recent
-    return lineups.sort((a, b) => b.uploadedAt - a.uploadedAt);
+    // Sort by most recent (already sorted from Firebase query, but keep for consistency)
+    return lineups.sort((a, b) => {
+      const aDate = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(a.uploadedAt);
+      const bDate = b.uploadedAt?.toDate ? b.uploadedAt.toDate() : new Date(b.uploadedAt);
+      return bDate - aDate;
+    });
   };
 
   const filteredLineups = getFilteredLineups();
@@ -179,17 +214,25 @@ export default function MapSelectionScreen({ navigation }) {
     }
   };
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    // Simulate refresh - in a real app, you'd refetch data here
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+    await fetchLineups();
+    setRefreshing(false);
   };
 
   const renderLineupCard = ({ item }) => (
     <LineupCard item={item} navigation={navigation} getMapName={getMapName} />
   );
+
+  // Show loading spinner on first load
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF6800" />
+        <Text style={styles.loadingText}>Loading lineups...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -402,6 +445,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1a1a1a',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+  },
+  loadingText: {
+    color: '#888',
+    marginTop: 15,
+    fontSize: 16,
   },
   header: {
     flexDirection: 'row',

@@ -4,6 +4,8 @@ import { Image } from 'expo-image';
 import { Asset } from 'expo-asset';
 import { Ionicons } from '@expo/vector-icons';
 import ImageView from 'react-native-image-viewing';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { useFollow } from '../context/FollowContext';
@@ -14,8 +16,9 @@ import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 
 export default function LineupDetailScreen({ route, navigation }) {
-  const { lineupId } = route.params;
-  const lineup = LINEUPS.find(l => l.id === lineupId);
+  // Accept BOTH lineup object AND lineupId for backwards compatibility
+  const { lineup: passedLineup, lineupId } = route.params;
+
   const { toggleUpvote, isUpvoted, getUpvoteCount } = useUpvotes();
   const { toggleFavorite, isFavorite } = useFavorites();
   const { isFollowing, followUser, unfollowUser } = useFollow();
@@ -148,18 +151,28 @@ export default function LineupDetailScreen({ route, navigation }) {
 
   // Prepare images for viewer - handle both local and remote images
   const getImageUri = (imageSource) => {
+    if (!imageSource) return null;
+    
+    // If it's already a string URL (Firebase Storage), return it
     if (typeof imageSource === 'string') {
       return imageSource;
     }
-    const asset = Asset.fromModule(imageSource);
-    return asset.localUri || asset.uri;
+    
+    // If it's a require() (local image), get the asset URI
+    try {
+      const asset = Asset.fromModule(imageSource);
+      return asset.localUri || asset.uri;
+    } catch (error) {
+      console.warn('Error loading image asset:', error);
+      return null;
+    }
   };
 
   const images = [
     { uri: getImageUri(lineup.standImage) },
     { uri: getImageUri(lineup.aimImage) },
     { uri: getImageUri(lineup.landImage) },
-  ];
+  ].filter(img => img.uri); // Remove any null images
 
   const openImageViewer = (index) => {
     setCurrentImageIndex(index);
@@ -175,7 +188,7 @@ export default function LineupDetailScreen({ route, navigation }) {
       if (isFollowingCreator) {
         await unfollowUser(creator.id, creator.playerID, creator.username);
       } else {
-        await followUser(creator.id, creator.username, creator.profilePicture, creator.playerID);
+        await followUser(creator.id, creator.username, creator.profilePicture);
       }
       await refreshCreator();
     } finally {
@@ -192,7 +205,7 @@ export default function LineupDetailScreen({ route, navigation }) {
     <ScrollView style={styles.container}>
       {/* Header Info */}
       <View style={styles.header}>
-        {/* Creator Row - NEW */}
+        {/* Creator Row */}
         {creator && (
           <View style={styles.creatorRow}>
             <TouchableOpacity 
@@ -214,7 +227,7 @@ export default function LineupDetailScreen({ route, navigation }) {
                 <View style={styles.creatorNameRow}>
                   <Text style={styles.creatorUsername}>{creator.username}</Text>
                   {creator.isVerified && (
-                    <Ionicons name="checkmark-circle" size={16} color="#5E98D9" />
+                    <Ionicons name="checkmark-circle" size={16} color="#5E98D9" style={{ marginLeft: 4 }} />
                   )}
                 </View>
                 <Text style={styles.creatorFollowers}>
@@ -291,10 +304,12 @@ export default function LineupDetailScreen({ route, navigation }) {
       </View>
 
       {/* Throw Instructions */}
-      <View style={styles.instructionBox}>
-        <Text style={styles.instructionLabel}>How to Throw:</Text>
-        <Text style={styles.instructionText}>{lineup.throwType}</Text>
-      </View>
+      {lineup.throwType && (
+        <View style={styles.instructionBox}>
+          <Text style={styles.instructionLabel}>How to Throw:</Text>
+          <Text style={styles.instructionText}>{lineup.throwType}</Text>
+        </View>
+      )}
 
       {/* Image 1: Where to Stand */}
       <View style={styles.imageSection}>
@@ -427,7 +442,6 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#2a2a2a',
   },
-  // NEW: Creator row styles
   creatorRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -463,7 +477,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',
-    marginRight: 4,
   },
   creatorFollowers: {
     fontSize: 13,
@@ -488,19 +501,36 @@ const styles = StyleSheet.create({
   followingButtonText: {
     color: '#fff',
   },
-  // Existing styles below...
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 10,
   },
-  title: {
+  titleContainer: {
     flex: 1,
+    marginRight: 10,
+  },
+  title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
-    marginRight: 10,
+    marginBottom: 8,
+  },
+  textbookBadgeDetail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#5E98D9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  textbookLabel: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   favoriteButton: {
     padding: 5,
@@ -509,6 +539,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#aaa',
     marginBottom: 15,
+    lineHeight: 22,
   },
   tags: {
     flexDirection: 'row',
@@ -579,6 +610,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#3a3a3a',
   },
+  detailImageLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 250,
+    backgroundColor: '#3a3a3a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 10,
+  },
   zoomHint: {
     position: 'absolute',
     bottom: 10,
@@ -622,46 +664,35 @@ const styles = StyleSheet.create({
     color: '#aaa',
     marginBottom: 10,
   },
-  titleContainer: {
-    flex: 1,
-    marginRight: 10,
-  },
-  textbookBadgeDetail: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#5E98D9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 8,
-    alignSelf: 'flex-start',
-  },
-  textbookLabel: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  detailImageLoading: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 250,
-    backgroundColor: '#3a3a3a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 10,
-  },
   errorContainer: {
     flex: 1,
     backgroundColor: '#1a1a1a',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 40,
   },
   errorText: {
     fontSize: 18,
     color: '#666',
     marginTop: 15,
+    textAlign: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#888',
+    marginTop: 15,
+    textAlign: 'center',
+  },
+  backButton: {
+    marginTop: 20,
+    backgroundColor: '#FF6800',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

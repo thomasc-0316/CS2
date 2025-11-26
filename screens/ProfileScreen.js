@@ -9,9 +9,8 @@ import { useDrafts } from '../context/DraftsContext';
 import { useFollow } from '../context/FollowContext';
 import { useAuth } from '../context/AuthContext';  // ADD THIS
 import { useProfile } from '../context/ProfileContext';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';  // ADD THIS
-import { db } from '../firebaseConfig';  // ADD THIS
-import { LINEUPS } from '../data/lineups';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
 import FollowersFollowingModal from '../components/FollowersFollowingModal';
 
@@ -128,8 +127,9 @@ export default function ProfileScreen() {
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalTab, setFollowModalTab] = useState('followers');
   const [refreshing, setRefreshing] = useState(false);
-  const [myLineups, setMyLineups] = useState([]);  // ADD THIS - State for user's lineups
-  const [loading, setLoading] = useState(false);  // ADD THIS
+  const [myLineups, setMyLineups] = useState([]);
+  const [favoriteLineups, setFavoriteLineups] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Get user profile prioritizing locally edited profile, with Firebase as fallback
   const profileFromAuth = currentUser?.profile || {};
@@ -156,38 +156,92 @@ export default function ProfileScreen() {
   const followingCount = getFollowingCount() || profile.following || 0;
 
   const favoriteIds = getFavorites();
-  const favoriteLineups = LINEUPS.filter(lineup => favoriteIds.includes(lineup.id));
   const upvotedLineups = [];
 
   // Fetch user's lineups from Firestore
   useEffect(() => {
-    if (currentUser && activeTab === 'myLineups') {
-      fetchMyLineups();
-    }
+    const fetchData = async () => {
+      if (currentUser && activeTab === 'myLineups') {
+        if (!currentUser) return;
+
+        try {
+          setLoading(true);
+          const q = query(
+            collection(db, 'lineups'),
+            where('creatorId', '==', currentUser.uid),
+            orderBy('uploadedAt', 'desc')
+          );
+          const snapshot = await getDocs(q);
+          const lineups = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setMyLineups(lineups);
+        } catch (error) {
+          console.error('Error fetching lineups:', error);
+          Alert.alert(
+            'Failed to Load Lineups',
+            'Could not load your lineups. Please try again.',
+            [{ text: 'OK' }]
+          );
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchData();
   }, [currentUser, activeTab]);
 
-  const fetchMyLineups = async () => {
-    if (!currentUser) return;
-    
-    try {
-      setLoading(true);
-      const q = query(
-        collection(db, 'lineups'),
-        where('creatorId', '==', currentUser.uid),
-        orderBy('uploadedAt', 'desc')
-      );
-      const snapshot = await getDocs(q);
-      const lineups = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setMyLineups(lineups);
-    } catch (error) {
-      console.error('Error fetching lineups:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Fetch favorite lineups from Firestore
+  useEffect(() => {
+    const fetchData = async () => {
+      if (activeTab === 'favorites') {
+        if (favoriteIds.length === 0) {
+          setFavoriteLineups([]);
+          return;
+        }
+
+        try {
+          setLoading(true);
+
+          const stringIds = favoriteIds.map(id => id.toString());
+          const batches = [];
+          for (let i = 0; i < stringIds.length; i += 10) {
+            const batch = stringIds.slice(i, i + 10);
+            batches.push(batch);
+          }
+
+          const allLineups = [];
+          for (const batch of batches) {
+            const q = query(
+              collection(db, 'lineups'),
+              where('__name__', 'in', batch)
+            );
+
+            const snapshot = await getDocs(q);
+            const lineups = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+            allLineups.push(...lineups);
+          }
+
+          setFavoriteLineups(allLineups);
+        } catch (error) {
+          console.error('Error fetching favorite lineups:', error);
+          Alert.alert(
+            'Failed to Load Favorites',
+            'Could not load your favorite lineups. Please try again.',
+            [{ text: 'OK' }]
+          );
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchData();
+  }, [activeTab, favoriteIds.length]);
+
 
   // Calculate total upvotes received on user's posts
   const totalUpvotesReceived = myLineups.reduce((total, lineup) => {
@@ -339,10 +393,15 @@ export default function ProfileScreen() {
               <Text style={styles.statLabel}>Following</Text>
             </TouchableOpacity>
             <View style={styles.statDivider} />
-            <TouchableOpacity style={styles.statItem}>
+            <View style={styles.statItem}>
               <Text style={styles.statNumber}>{myLineups.length}</Text>
               <Text style={styles.statLabel}>Lineups</Text>
-            </TouchableOpacity>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{totalUpvotesReceived}</Text>
+              <Text style={styles.statLabel}>Upvotes</Text>
+            </View>
           </View>
 
           {/* Action Buttons (right side) */}
@@ -445,9 +504,68 @@ export default function ProfileScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    if (activeTab === 'myLineups') {
-      await fetchMyLineups();
+
+    // Trigger a re-fetch by setting a refresh key or just wait a bit
+    // The useEffects will handle the actual fetching based on activeTab
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Re-trigger the appropriate useEffect
+    if (activeTab === 'myLineups' && currentUser) {
+      try {
+        const q = query(
+          collection(db, 'lineups'),
+          where('creatorId', '==', currentUser.uid),
+          orderBy('uploadedAt', 'desc')
+        );
+        const snapshot = await getDocs(q);
+        const lineups = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setMyLineups(lineups);
+      } catch (error) {
+        console.error('Error refreshing lineups:', error);
+        Alert.alert(
+          'Refresh Failed',
+          'Could not refresh your lineups. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
+    } else if (activeTab === 'favorites' && favoriteIds.length > 0) {
+      try {
+        const stringIds = favoriteIds.map(id => id.toString());
+        const batches = [];
+        for (let i = 0; i < stringIds.length; i += 10) {
+          const batch = stringIds.slice(i, i + 10);
+          batches.push(batch);
+        }
+
+        const allLineups = [];
+        for (const batch of batches) {
+          const q = query(
+            collection(db, 'lineups'),
+            where('__name__', 'in', batch)
+          );
+
+          const snapshot = await getDocs(q);
+          const lineups = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          allLineups.push(...lineups);
+        }
+
+        setFavoriteLineups(allLineups);
+      } catch (error) {
+        console.error('Error refreshing favorites:', error);
+        Alert.alert(
+          'Refresh Failed',
+          'Could not refresh your favorites. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
     }
+
     setRefreshing(false);
   };
 
@@ -546,7 +664,7 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 0.45,
+    flex: 0.65,
   },
   statItem: {
     alignItems: 'center',
