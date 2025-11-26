@@ -8,7 +8,6 @@ import { db } from '../firebaseConfig';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useFollow } from '../context/FollowContext';
 import { MAPS } from '../data/maps';
-import { getUserById } from '../data/users';
 import { useAuth } from '../context/AuthContext';
 
 // Lineup card component
@@ -78,8 +77,7 @@ export default function UserProfileScreen({ route }) {
     try {
       setLoadingUser(true);
       const liveUser = await getUserProfile(userId);
-      const fallbackUser = getUserById(userId);
-      setUser(liveUser || fallbackUser || null);
+      setUser(liveUser || null);
     } finally {
       setLoadingUser(false);
     }
@@ -88,6 +86,34 @@ export default function UserProfileScreen({ route }) {
   useEffect(() => {
     loadUser();
   }, [userId]);
+
+  // Load user's lineups from Firebase
+  useEffect(() => {
+    const loadLineups = async () => {
+      if (!userId) return;
+      try {
+        setLoadingLineups(true);
+        const lineupsQuery = query(
+          collection(db, 'lineups'),
+          where('creatorId', '==', userId),
+          orderBy('createdAt', 'desc')
+        );
+        const querySnapshot = await getDocs(lineupsQuery);
+        const lineups = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setUserLineups(lineups);
+      } catch (error) {
+        console.error('Failed to load user lineups:', error);
+        setUserLineups([]);
+      } finally {
+        setLoadingLineups(false);
+      }
+    };
+    loadLineups();
+  }, [userId]);
+
   const isFollowingUser = user ? isFollowing(user.id, user.playerID, user.username) : false;
   const isOwnProfile = currentUser?.uid === userId;
 
@@ -96,9 +122,6 @@ export default function UserProfileScreen({ route }) {
   const dynamicFollowerCount = baseFollowerCount > 0
     ? baseFollowerCount
     : (isFollowingUser ? 1 : 0);
-
-  // Get user's lineups
-  const userLineups = LINEUPS.filter(lineup => lineup.creatorId === userId);
 
   // Calculate total upvotes received on user's posts
   const totalUpvotesReceived = userLineups.reduce((total, lineup) => {

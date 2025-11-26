@@ -9,38 +9,24 @@ import { db } from '../firebaseConfig';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { useFollow } from '../context/FollowContext';
-import { getUserById } from '../data/users';
-import { LINEUPS } from '../data/lineups';
 import { useAuth } from '../context/AuthContext';
 import { collection, getDocs, limit, query, where } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
 
 export default function LineupDetailScreen({ route, navigation }) {
-  // Accept BOTH lineup object AND lineupId for backwards compatibility
-  const { lineup: passedLineup, lineupId } = route.params;
+  const { lineupId } = route.params;
 
   const { toggleUpvote, isUpvoted, getUpvoteCount } = useUpvotes();
   const { toggleFavorite, isFavorite } = useFavorites();
   const { isFollowing, followUser, unfollowUser } = useFollow();
   const { getUserProfile, currentUser } = useAuth();
 
-  if (!lineup) {
-    return (
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle-outline" size={60} color="#666" />
-        <Text style={styles.errorText}>Lineup not found</Text>
-      </View>
-    );
-  }
+  // State for lineup loaded from Firebase
+  const [lineup, setLineup] = useState(null);
+  const [lineupLoading, setLineupLoading] = useState(true);
 
-  const upvoted = isUpvoted(lineup.id);
-  const upvoteCount = getUpvoteCount(lineup);
-  const favorited = isFavorite(lineup.id);
-
-  // Get creator info (live from Firestore, fallback to static seed data)
-  const staticCreator = getUserById(lineup.creatorId);
-  const [creatorProfile, setCreatorProfile] = useState(staticCreator || null);
-  const [creatorSource, setCreatorSource] = useState(staticCreator ? 'static' : 'unknown');
+  // Get creator info from Firestore
+  const [creatorProfile, setCreatorProfile] = useState(null);
+  const [creatorSource, setCreatorSource] = useState('unknown');
   const lookupByUsername = useCallback(async (username) => {
     if (!username) return null;
     try {
@@ -79,21 +65,46 @@ export default function LineupDetailScreen({ route, navigation }) {
     return null;
   }, []);
 
+  // Load lineup from Firebase
+  useEffect(() => {
+    let isMounted = true;
+    const loadLineup = async () => {
+      if (!lineupId) {
+        setLineupLoading(false);
+        return;
+      }
+      try {
+        const lineupDoc = await getDoc(doc(db, 'lineups', lineupId));
+        if (isMounted && lineupDoc.exists()) {
+          setLineup({ id: lineupDoc.id, ...lineupDoc.data() });
+        }
+      } catch (error) {
+        console.error('Failed to load lineup', error);
+      } finally {
+        if (isMounted) {
+          setLineupLoading(false);
+        }
+      }
+    };
+    loadLineup();
+    return () => {
+      isMounted = false;
+    };
+  }, [lineupId]);
+
   useEffect(() => {
     let isMounted = true;
     const loadCreator = async () => {
+      if (!lineup) return;
       try {
         const liveProfile = await getUserProfile(lineup.creatorId);
         const resolvedProfile =
           liveProfile ||
-          (await lookupByPlayerId(staticCreator?.playerID)) ||
+          (await lookupByPlayerId(lineup.creatorId)) ||
           (await lookupByUsername(lineup.creatorUsername));
         if (isMounted && resolvedProfile) {
           setCreatorProfile(resolvedProfile);
           setCreatorSource('live');
-        } else if (isMounted) {
-          setCreatorProfile(staticCreator || null);
-          setCreatorSource('static');
         }
       } catch (error) {
         console.error('Failed to load creator profile', error);
@@ -103,9 +114,9 @@ export default function LineupDetailScreen({ route, navigation }) {
     return () => {
       isMounted = false;
     };
-  }, [lineup.creatorId, lineup.creatorUsername, getUserProfile, lookupByUsername, lookupByPlayerId, staticCreator]);
+  }, [lineup, getUserProfile, lookupByUsername, lookupByPlayerId]);
 
-  const creator = creatorProfile || staticCreator;
+  const creator = creatorProfile;
   const isFollowingCreator = creator ? isFollowing(creator.id, creator.playerID, creator.username) : false;
   const isOwnProfile = currentUser?.uid && creator?.id === currentUser.uid;
   const baseFollowerCount =
@@ -125,6 +136,7 @@ export default function LineupDetailScreen({ route, navigation }) {
   const [thirdPersonLoading, setThirdPersonLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
   const refreshCreator = async () => {
+    if (!lineup) return;
     try {
       const updated = await getUserProfile(lineup.creatorId);
       if (updated) {
@@ -133,19 +145,43 @@ export default function LineupDetailScreen({ route, navigation }) {
         return;
       }
       const fallback =
-        (await lookupByPlayerId(staticCreator?.playerID)) ||
+        (await lookupByPlayerId(lineup.creatorId)) ||
         (await lookupByUsername(lineup.creatorUsername));
       if (fallback) {
         setCreatorProfile(fallback);
         setCreatorSource('live');
         return;
       }
-      setCreatorSource(staticCreator ? 'static' : 'unknown');
+      setCreatorSource('unknown');
     } catch (error) {
       console.error('Failed to refresh creator profile', error);
     }
   };
-  
+
+  // Show loading state while lineup is loading
+  if (lineupLoading) {
+    return (
+      <View style={styles.errorContainer}>
+        <ActivityIndicator size="large" color="#FF6800" />
+        <Text style={styles.loadingText}>Loading lineup...</Text>
+      </View>
+    );
+  }
+
+  // Show error if lineup not found
+  if (!lineup) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={60} color="#666" />
+        <Text style={styles.errorText}>Lineup not found</Text>
+      </View>
+    );
+  }
+
+  const upvoted = isUpvoted(lineup.id);
+  const upvoteCount = getUpvoteCount(lineup);
+  const favorited = isFavorite(lineup.id);
+
   // Check if third person image exists
   const hasThirdPerson = !!lineup.standImageThirdPerson;
 
