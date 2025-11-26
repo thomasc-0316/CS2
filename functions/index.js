@@ -14,16 +14,16 @@ exports.onFollowerAdded = onDocumentCreated(
 
       try {
         // Increment target user's follower count
-        await db.collection("users").doc(userId).update({
+        await db.collection("users").doc(userId).set({
           followers: FieldValue.increment(1),
           updatedAt: FieldValue.serverTimestamp(),
-        });
+        }, {merge: true});
 
         // Increment following user's following count
-        await db.collection("users").doc(followerId).update({
+        await db.collection("users").doc(followerId).set({
           following: FieldValue.increment(1),
           updatedAt: FieldValue.serverTimestamp(),
-        });
+        }, {merge: true});
 
         console.log(`Follower added: ${followerId} -> ${userId}`);
       } catch (error) {
@@ -41,16 +41,16 @@ exports.onFollowerRemoved = onDocumentDeleted(
 
       try {
         // Decrement target user's follower count
-        await db.collection("users").doc(userId).update({
+        await db.collection("users").doc(userId).set({
           followers: FieldValue.increment(-1),
           updatedAt: FieldValue.serverTimestamp(),
-        });
+        }, {merge: true});
 
         // Decrement following user's following count
-        await db.collection("users").doc(followerId).update({
+        await db.collection("users").doc(followerId).set({
           following: FieldValue.increment(-1),
           updatedAt: FieldValue.serverTimestamp(),
-        });
+        }, {merge: true});
 
         console.log(`Follower removed: ${followerId} -> ${userId}`);
       } catch (error) {
