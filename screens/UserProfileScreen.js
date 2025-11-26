@@ -95,8 +95,7 @@ export default function UserProfileScreen({ route }) {
           const lineupsQuery = query(
             collection(db, 'lineups'),
             where('creatorId', '==', userId),
-            where('isPublic', '==', true),
-            orderBy('uploadedAt', 'desc')
+            where('isPublic', '==', true)
           );
           const querySnapshot = await getDocs(lineupsQuery);
           lineups = querySnapshot.docs.map(doc => ({
@@ -113,8 +112,7 @@ export default function UserProfileScreen({ route }) {
             const lineupsQuery = query(
               collection(db, 'lineups'),
               where('creatorPlayerId', '==', profile.playerID),
-              where('isPublic', '==', true),
-              orderBy('uploadedAt', 'desc')
+              where('isPublic', '==', true)
             );
             const querySnapshot = await getDocs(lineupsQuery);
             lineups = querySnapshot.docs.map(doc => ({
@@ -125,6 +123,13 @@ export default function UserProfileScreen({ route }) {
             console.error('Failed to load lineups by playerID:', error);
           }
         }
+
+        // Sort client-side by uploadedAt desc
+        lineups.sort((aItem, bItem) => {
+          const aDate = aItem.uploadedAt?.toDate ? aItem.uploadedAt.toDate() : new Date(aItem.uploadedAt);
+          const bDate = bItem.uploadedAt?.toDate ? bItem.uploadedAt.toDate() : new Date(bItem.uploadedAt);
+          return bDate - aDate;
+        });
 
         setUserLineups(lineups);
       } catch (error) {
@@ -233,22 +238,27 @@ export default function UserProfileScreen({ route }) {
 
         {/* Stats and Follow Button Row */}
         <View style={styles.statsAndButtonsRow}>
-          {/* Stats (left side) */}
+          {/* Stats */}
           <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
+            <TouchableOpacity style={styles.statItem}>
               <Text style={styles.statNumber}>{dynamicFollowerCount.toLocaleString()}</Text>
               <Text style={styles.statLabel}>Followers</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.statDivider} />
-            <View style={styles.statItem}>
+            <TouchableOpacity style={styles.statItem}>
               <Text style={styles.statNumber}>{user?.following || 0}</Text>
               <Text style={styles.statLabel}>Following</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.statDivider} />
-            <View style={styles.statItem}>
+            <TouchableOpacity style={styles.statItem}>
+              <Text style={styles.statNumber}>{userLineups.length}</Text>
+              <Text style={styles.statLabel}>Lineups</Text>
+            </TouchableOpacity>
+            <View style={styles.statDivider} />
+            <TouchableOpacity style={styles.statItem}>
               <Text style={styles.statNumber}>{totalUpvotesReceived}</Text>
               <Text style={styles.statLabel}>Upvotes</Text>
-            </View>
+            </TouchableOpacity>
           </View>
 
           {/* Follow Button (right side) */}
@@ -419,11 +429,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: 10,
+    gap: 6,
   },
   statsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 0.6,
+    flex: 1,
+    gap: 6,
   },
   statItem: {
     alignItems: 'center',
@@ -431,7 +444,7 @@ const styles = StyleSheet.create({
   },
   statDivider: {
     width: 1,
-    height: 12,
+    height: 14,
     backgroundColor: '#444',
   },
   statNumber: {
@@ -447,8 +460,8 @@ const styles = StyleSheet.create({
   followButton: {
     backgroundColor: '#FF6800',
     paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 6,
-    width: 110,
     alignItems: 'center',
     justifyContent: 'center',
   },
