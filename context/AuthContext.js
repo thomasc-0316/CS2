@@ -4,7 +4,9 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  updateProfile
+  updateProfile,
+  GoogleAuthProvider,
+  signInWithCredential
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
@@ -18,6 +20,55 @@ const generatePlayerID = () => {
 };
 
 const toLower = (value = '') => value.toString().trim().toLowerCase();
+
+// Create Firestore user document if it does not exist
+const createUserProfileDocument = async (user, overrides = {}) => {
+  if (!user?.uid) return null;
+
+  const userDocRef = doc(db, 'users', user.uid);
+  const existingDoc = await getDoc(userDocRef);
+
+  if (!existingDoc.exists()) {
+    const username =
+      overrides.username ||
+      user.displayName ||
+      user.email?.split('@')[0] ||
+      'player';
+
+    const profileData = {
+      id: user.uid,
+      username,
+      usernameLower: toLower(username),
+      email: overrides.email || user.email || '',
+      displayName: overrides.displayName || user.displayName || username,
+      playerID: overrides.playerID || generatePlayerID(),
+      bio: '',
+      profilePicture: overrides.profilePicture ?? user.photoURL ?? null,
+      pronouns: '',
+      followers: 0,
+      following: 0,
+      totalLineups: 0,
+      totalUpvotes: 0,
+      isVerified: false,
+      isBanned: false,
+      role: 'user',
+      settings: {
+        notifications: true,
+        privateProfile: false,
+        language: 'en'
+      },
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      lastActive: serverTimestamp(),
+      ...overrides
+    };
+
+    await setDoc(userDocRef, profileData);
+    return { id: user.uid, ...profileData };
+  }
+
+  return { id: existingDoc.id, ...existingDoc.data() };
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -38,7 +89,6 @@ export const AuthProvider = ({ children }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       const playerID = generatePlayerID();
-      const usernameLower = toLower(username);
 
       // 2. Update display name in Auth
       await updateProfile(user, {
@@ -46,31 +96,11 @@ export const AuthProvider = ({ children }) => {
       });
 
       // 3. Create Firestore user document
-      await setDoc(doc(db, 'users', user.uid), {
-        id: user.uid,
-        username: username,
-        usernameLower,
-        email: email,
+      await createUserProfileDocument(user, {
+        username,
         displayName: displayName || username,
-        playerID,
-        bio: '',
-        profilePicture: null,
-        pronouns: '',
-        followers: 0,
-        following: 0,
-        totalLineups: 0,
-        totalUpvotes: 0,
-        isVerified: false,
-        isBanned: false,
-        role: 'user',
-        settings: {
-          notifications: true,
-          privateProfile: false,
-          language: 'en'
-        },
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        lastActive: serverTimestamp()
+        email,
+        playerID
       });
 
       return user;
@@ -87,6 +117,31 @@ export const AuthProvider = ({ children }) => {
       return userCredential.user;
     } catch (error) {
       console.error('Login error:', error);
+      throw error;
+    }
+  };
+
+  // Login with Google ID token (Firebase credential)
+  const loginWithGoogle = async (idToken) => {
+    try {
+      if (!idToken) {
+        throw new Error('Missing Google ID token');
+      }
+
+      const credential = GoogleAuthProvider.credential(idToken);
+      const userCredential = await signInWithCredential(auth, credential);
+      const user = userCredential.user;
+
+      await createUserProfileDocument(user, {
+        email: user.email,
+        displayName: user.displayName || user.email?.split('@')[0],
+        username: user.displayName || user.email?.split('@')[0],
+        profilePicture: user.photoURL || null
+      });
+
+      return user;
+    } catch (error) {
+      console.error('Google login error:', error);
       throw error;
     }
   };
@@ -155,18 +210,36 @@ export const AuthProvider = ({ children }) => {
   // Listen to auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+      if (!user) {
+        setCurrentUser(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
         // User is logged in, fetch their profile
-        const profile = await getUserProfile(user.uid);
+        let profile = await getUserProfile(user.uid);
+
+        // Ensure a Firestore profile exists (covers first-time Google sign-in)
+        if (!profile) {
+          profile = await createUserProfileDocument(user);
+        }
+
         setCurrentUser({
           ...user,
           profile: profile
         });
-      } else {
-        // User is logged out
+      } catch (error) {
+        console.error('Auth bootstrap error:', error);
         setCurrentUser(null);
+        try {
+          await signOut(auth);
+        } catch (_) {
+          // ignore sign-out errors here
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return unsubscribe;
@@ -176,10 +249,14 @@ export const AuthProvider = ({ children }) => {
     currentUser,
     signup,
     login,
+    loginWithGoogle,
     logout,
     loading,
     getUserProfile,
-    updateUserProfile
+    updateUserProfile,
+    signUpWithEmail: signup,
+    signInWithEmail: login,
+    signOutUser: logout
   };
 
   return (
