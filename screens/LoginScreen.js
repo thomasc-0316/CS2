@@ -17,25 +17,25 @@ import { useAuth } from '../context/AuthContext';
 
 WebBrowser.maybeCompleteAuthSession();
 
+// --- CONFIGURATION ---
 const GOOGLE_WEB_CLIENT_ID = '563685919534-a19qr9hubus44sme0aqhq7hoc6rejica.apps.googleusercontent.com';
+// Native ID kept for future reference if you switch off proxy later
 const GOOGLE_IOS_CLIENT_ID = '563685919534-2fg45eppv095rgqk7jkuap0dgk27ojh2.apps.googleusercontent.com';
+const GOOGLE_ANDROID_CLIENT_ID = "563685919534-oc16fkrv6d5uacpjp9uvop0r3oecf27n.apps.googleusercontent.com"
 
 export const googleClientIds = {
-  expo: GOOGLE_WEB_CLIENT_ID, // Expo Go uses the web client ID with Expo's HTTPS proxy redirect
-  ios: GOOGLE_IOS_CLIENT_ID,  // Native iOS dev/build can switch to a custom scheme later
-  android: GOOGLE_WEB_CLIENT_ID,
+  expo: GOOGLE_WEB_CLIENT_ID,
+  ios: GOOGLE_IOS_CLIENT_ID, 
+  android: GOOGLE_ANDROID_CLIENT_ID,
   web: GOOGLE_WEB_CLIENT_ID,
 };
 
-// Force Expo's HTTPS proxy so Google accepts the redirect (no exp://). Allow this redirect in GCP:
-// https://auth.expo.io/@<expo-username>/CSLineupsApp (origin https://auth.expo.io)
-const useProxy = true;
+// Force Expo's HTTPS proxy. This requires the "Web Client ID".
+const useProxy = false;
+
 const redirectUri = makeRedirectUri({
   useProxy,
-  // To move to dev builds with a custom scheme later, set useProxy to false and add `scheme: 'cs2tactics'`
-  // (and register that scheme + redirect in the Google OAuth client).
 });
-
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -45,24 +45,11 @@ export default function LoginScreen({ navigation }) {
 
   const { login, loginWithGoogle } = useAuth();
 
-  const resolvedClientIds = {
-    expo: googleClientIds.expo && !googleClientIds.expo.startsWith('YOUR_') ? googleClientIds.expo : undefined,
-    ios: googleClientIds.ios && !googleClientIds.ios.startsWith('YOUR_') ? googleClientIds.ios : undefined,
-    android: googleClientIds.android && !googleClientIds.android.startsWith('YOUR_') ? googleClientIds.android : undefined,
-    web: googleClientIds.web && !googleClientIds.web.startsWith('YOUR_') ? googleClientIds.web : undefined,
-  };
-  const isGoogleConfigured = Boolean(
-    resolvedClientIds.expo ||
-    resolvedClientIds.ios ||
-    resolvedClientIds.android ||
-    resolvedClientIds.web
-  );
-
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    expoClientId: resolvedClientIds.expo,
-    iosClientId: resolvedClientIds.ios,
-    androidClientId: resolvedClientIds.android,
-    webClientId: resolvedClientIds.web,
+    clientId: googleClientIds.web, // Simplified: Just use the Web ID for everything when using Proxy
+    iosClientId: googleClientIds.ios,
+    androidClientId: googleClientIds.android,
+    webClientId: googleClientIds.web,
     redirectUri,
   });
 
@@ -78,7 +65,6 @@ export default function LoginScreen({ navigation }) {
 
     try {
       await login(email, password);
-      // User is automatically redirected by AuthContext
     } catch (error) {
       let errorMessage = 'Failed to log in';
       
@@ -97,11 +83,6 @@ export default function LoginScreen({ navigation }) {
   };
 
   const handleGoogleLogin = async () => {
-    if (!isGoogleConfigured) {
-      Alert.alert('Google sign-in not configured', 'Add your Google OAuth client IDs in LoginScreen.js (see README).');
-      return;
-    }
-
     if (!request) {
       Alert.alert('Error', 'Google sign-in is not ready yet. Please try again in a moment.');
       return;
@@ -109,7 +90,6 @@ export default function LoginScreen({ navigation }) {
 
     try {
       setGoogleLoading(true);
-      // useProxy ensures redirectUri is https://auth.expo.io/... which satisfies Google's OAuth policy.
       await promptAsync({ useProxy });
     } catch (error) {
       setGoogleLoading(false);
@@ -192,7 +172,7 @@ export default function LoginScreen({ navigation }) {
         <TouchableOpacity
           style={[styles.button, styles.googleButton]}
           onPress={handleGoogleLogin}
-          disabled={isBusy || !isGoogleConfigured}
+          disabled={isBusy}
         >
           {googleLoading ? (
             <ActivityIndicator color="#1a1a1a" />

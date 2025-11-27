@@ -15,18 +15,39 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.CSLineupsApp.ios"
+      "bundleIdentifier": "com.CSLineupsApp.ios",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "cslineupsapp",
+              "com.googleusercontent.apps.563685919534-2fg45eppv095rgqk7jkuap0dgk27ojh2"
+            ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "cslineupsapp",
+              "com.googleusercontent.apps.563685919534-2fg45eppv095rgqk7jkuap0dgk27ojh2"
+            ]
+          }
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "package": "com.CSLineupsApp.android",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.CSLineupsApp.ios"
+      "package": "com.cslineupsapp.android"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "15fb3664-630c-478b-b662-6327076d918a"
+      }
     }
   }
 }
