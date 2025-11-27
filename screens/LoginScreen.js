@@ -12,19 +12,29 @@ import {
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 import { useAuth } from '../context/AuthContext';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const GOOGLE_WEB_CLIENT_ID =
-  '563685919534-a19qr9hubus44sme0aqhq7hoc6rejica.apps.googleusercontent.com';
+const GOOGLE_WEB_CLIENT_ID = '563685919534-a19qr9hubus44sme0aqhq7hoc6rejica.apps.googleusercontent.com';
+const GOOGLE_IOS_CLIENT_ID = '563685919534-2fg45eppv095rgqk7jkuap0dgk27ojh2.apps.googleusercontent.com';
 
 export const googleClientIds = {
-  expo: GOOGLE_WEB_CLIENT_ID,
-  ios: GOOGLE_WEB_CLIENT_ID,
+  expo: GOOGLE_WEB_CLIENT_ID, // Expo Go uses the web client ID with Expo's HTTPS proxy redirect
+  ios: GOOGLE_IOS_CLIENT_ID,  // Native iOS dev/build can switch to a custom scheme later
   android: GOOGLE_WEB_CLIENT_ID,
   web: GOOGLE_WEB_CLIENT_ID,
 };
+
+// Force Expo's HTTPS proxy so Google accepts the redirect (no exp://). Allow this redirect in GCP:
+// https://auth.expo.io/@<expo-username>/CSLineupsApp (origin https://auth.expo.io)
+const useProxy = true;
+const redirectUri = makeRedirectUri({
+  useProxy,
+  // To move to dev builds with a custom scheme later, set useProxy to false and add `scheme: 'cs2tactics'`
+  // (and register that scheme + redirect in the Google OAuth client).
+});
 
 
 export default function LoginScreen({ navigation }) {
@@ -53,6 +63,7 @@ export default function LoginScreen({ navigation }) {
     iosClientId: resolvedClientIds.ios,
     androidClientId: resolvedClientIds.android,
     webClientId: resolvedClientIds.web,
+    redirectUri,
   });
 
   const handleLogin = async () => {
@@ -98,7 +109,8 @@ export default function LoginScreen({ navigation }) {
 
     try {
       setGoogleLoading(true);
-      await promptAsync();
+      // useProxy ensures redirectUri is https://auth.expo.io/... which satisfies Google's OAuth policy.
+      await promptAsync({ useProxy });
     } catch (error) {
       setGoogleLoading(false);
       Alert.alert('Error', 'Google sign-in could not start. Please try again.');
