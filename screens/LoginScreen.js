@@ -19,9 +19,8 @@ WebBrowser.maybeCompleteAuthSession();
 
 // --- CONFIGURATION ---
 const GOOGLE_WEB_CLIENT_ID = '563685919534-a19qr9hubus44sme0aqhq7hoc6rejica.apps.googleusercontent.com';
-// Native ID kept for future reference if you switch off proxy later
 const GOOGLE_IOS_CLIENT_ID = '563685919534-2fg45eppv095rgqk7jkuap0dgk27ojh2.apps.googleusercontent.com';
-const GOOGLE_ANDROID_CLIENT_ID = "563685919534-oc16fkrv6d5uacpjp9uvop0r3oecf27n.apps.googleusercontent.com"
+const GOOGLE_ANDROID_CLIENT_ID = "563685919534-oc16fkrv6d5uacpjp9uvop0r3oecf27n.apps.googleusercontent.com";
 
 export const googleClientIds = {
   expo: GOOGLE_WEB_CLIENT_ID,
@@ -30,11 +29,14 @@ export const googleClientIds = {
   web: GOOGLE_WEB_CLIENT_ID,
 };
 
-// Force Expo's HTTPS proxy. This requires the "Web Client ID".
+// Disable proxy for Native builds (Simulator/Device)
 const useProxy = false;
 
+// ⚠️ CRITICAL FIX: Explicitly match the Scheme defined in app.json
+// The format must be: <REVERSE_CLIENT_ID>:/oauth2redirect/google
 const redirectUri = makeRedirectUri({
   useProxy,
+  native: 'com.googleusercontent.apps.563685919534-2fg45eppv095rgqk7jkuap0dgk27ojh2:/oauth2redirect/google'
 });
 
 export default function LoginScreen({ navigation }) {
@@ -46,11 +48,11 @@ export default function LoginScreen({ navigation }) {
   const { login, loginWithGoogle } = useAuth();
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: googleClientIds.web, // Simplified: Just use the Web ID for everything when using Proxy
-    iosClientId: googleClientIds.ios,
+    // iOS must use the Native Client ID
+    iosClientId: googleClientIds.ios, 
     androidClientId: googleClientIds.android,
     webClientId: googleClientIds.web,
-    redirectUri,
+    redirectUri, 
   });
 
   const handleLogin = async () => {
@@ -90,7 +92,8 @@ export default function LoginScreen({ navigation }) {
 
     try {
       setGoogleLoading(true);
-      await promptAsync({ useProxy });
+      // Explicitly pass useProxy: false to force native flow
+      await promptAsync({ useProxy: false });
     } catch (error) {
       setGoogleLoading(false);
       Alert.alert('Error', 'Google sign-in could not start. Please try again.');

@@ -23,12 +23,6 @@
               "cslineupsapp",
               "com.googleusercontent.apps.563685919534-2fg45eppv095rgqk7jkuap0dgk27ojh2"
             ]
-          },
-          {
-            "CFBundleURLSchemes": [
-              "cslineupsapp",
-              "com.googleusercontent.apps.563685919534-2fg45eppv095rgqk7jkuap0dgk27ojh2"
-            ]
           }
         ],
         "ITSAppUsesNonExemptEncryption": false
