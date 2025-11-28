@@ -162,14 +162,6 @@ export default function EditProfileScreen({ navigation }) {
     setProfilePicture(null);
   };
 
-  const handleConnectSteam = () => {
-    Alert.alert(
-      'Connect to Steam',
-      'This feature will be available soon!',
-      [{ text: 'OK' }]
-    );
-  };
-
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -257,13 +249,6 @@ export default function EditProfileScreen({ navigation }) {
               keyboardType="url"
             />
           </View>
-
-          {/* Connect to Steam */}
-          <TouchableOpacity style={styles.steamButton} onPress={handleConnectSteam}>
-            <Ionicons name="logo-steam" size={20} color="#fff" />
-            <Text style={styles.steamButtonText}>Connect to Steam</Text>
-            <Ionicons name="chevron-forward" size={20} color="#666" />
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -352,24 +337,5 @@ const styles = StyleSheet.create({
   bioInput: {
     minHeight: 60,
     textAlignVertical: 'top',
-  },
-  steamButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    marginHorizontal: 15,
-    marginTop: 20,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#333',
-    gap: 10,
-  },
-  steamButtonText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
   },
 });

@@ -29,9 +29,10 @@ export default function FollowersFollowingModal({ visible, onClose, initialTab =
 
   useEffect(() => {
     if (visible) {
+      setActiveTab(initialTab);
       refreshFollowers();
     }
-  }, [visible, refreshFollowers]);
+  }, [visible, initialTab, refreshFollowers]);
 
   const handleFollowToggle = async (user) => {
     if (isFollowing(user.id, user.playerID, user.username)) {
