@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,16 +10,54 @@ import {
   Platform,
   ActivityIndicator
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 import { useAuth } from '../context/AuthContext';
+
+WebBrowser.maybeCompleteAuthSession();
+
+// --- CONFIGURATION ---
+const GOOGLE_WEB_CLIENT_ID = '563685919534-a19qr9hubus44sme0aqhq7hoc6rejica.apps.googleusercontent.com';
+const GOOGLE_IOS_CLIENT_ID = '563685919534-2fg45eppv095rgqk7jkuap0dgk27ojh2.apps.googleusercontent.com';
+const GOOGLE_ANDROID_CLIENT_ID = "563685919534-oc16fkrv6d5uacpjp9uvop0r3oecf27n.apps.googleusercontent.com";
+
+export const googleClientIds = {
+  expo: GOOGLE_WEB_CLIENT_ID,
+  ios: GOOGLE_IOS_CLIENT_ID, 
+  android: GOOGLE_ANDROID_CLIENT_ID,
+  web: GOOGLE_WEB_CLIENT_ID,
+};
+
+// Disable proxy for Native builds (Simulator/Device)
+const useProxy = false;
+
+// ⚠️ CRITICAL FIX: Explicitly match the Scheme defined in app.json
+// The format must be: <REVERSE_CLIENT_ID>:/oauth2redirect/google
+const redirectUri = makeRedirectUri({
+  useProxy,
+  native: 'com.googleusercontent.apps.563685919534-2fg45eppv095rgqk7jkuap0dgk27ojh2:/oauth2redirect/google'
+});
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
+
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    // iOS must use the Native Client ID
+    iosClientId: googleClientIds.ios, 
+    androidClientId: googleClientIds.android,
+    webClientId: googleClientIds.web,
+    redirectUri, 
+  });
 
   const handleLogin = async () => {
+    if (googleLoading) return;
+
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -29,7 +67,6 @@ export default function LoginScreen({ navigation }) {
 
     try {
       await login(email, password);
-      // User is automatically redirected by AuthContext
     } catch (error) {
       let errorMessage = 'Failed to log in';
       
@@ -46,6 +83,54 @@ export default function LoginScreen({ navigation }) {
       setLoading(false);
     }
   };
+
+  const handleGoogleLogin = async () => {
+    if (!request) {
+      Alert.alert('Error', 'Google sign-in is not ready yet. Please try again in a moment.');
+      return;
+    }
+
+    try {
+      setGoogleLoading(true);
+      // Explicitly pass useProxy: false to force native flow
+      await promptAsync({ useProxy: false });
+    } catch (error) {
+      setGoogleLoading(false);
+      Alert.alert('Error', 'Google sign-in could not start. Please try again.');
+    }
+  };
+
+  useEffect(() => {
+    const finishGoogleLogin = async () => {
+      if (!response) return;
+
+      if (response.type !== 'success') {
+        setGoogleLoading(false);
+        return;
+      }
+
+      const idToken = response.params?.id_token;
+
+      if (!idToken) {
+        setGoogleLoading(false);
+        Alert.alert('Error', 'No ID token returned from Google.');
+        return;
+      }
+
+      try {
+        await loginWithGoogle(idToken);
+      } catch (error) {
+        console.error('Google sign-in error:', error);
+        Alert.alert('Error', 'Failed to sign in with Google. Please try again.');
+      } finally {
+        setGoogleLoading(false);
+      }
+    };
+
+    finishGoogleLogin();
+  }, [response, loginWithGoogle]);
+
+  const isBusy = loading || googleLoading;
 
   return (
     <KeyboardAvoidingView
@@ -78,12 +163,24 @@ export default function LoginScreen({ navigation }) {
         <TouchableOpacity
           style={styles.button}
           onPress={handleLogin}
-          disabled={loading}
+          disabled={isBusy}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.buttonText}>Log In</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.googleButton]}
+          onPress={handleGoogleLogin}
+          disabled={isBusy}
+        >
+          {googleLoading ? (
+            <ActivityIndicator color="#1a1a1a" />
+          ) : (
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
           )}
         </TouchableOpacity>
 
@@ -142,6 +239,15 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: 18,
+    fontWeight: 'bold',
+  },
+  googleButton: {
+    backgroundColor: '#fff',
+    marginTop: 12,
+  },
+  googleButtonText: {
+    color: '#1a1a1a',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   linkButton: {

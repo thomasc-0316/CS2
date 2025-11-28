@@ -2,6 +2,7 @@
   "expo": {
     "name": "CSLineupsApp",
     "slug": "CSLineupsApp",
+    "scheme": "cslineupsapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,17 +14,34 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.CSLineupsApp.ios",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "cslineupsapp",
+              "com.googleusercontent.apps.563685919534-2fg45eppv095rgqk7jkuap0dgk27ojh2"
+            ]
+          }
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.cslineupsapp.android"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "15fb3664-630c-478b-b662-6327076d918a"
+      }
     }
   }
 }
