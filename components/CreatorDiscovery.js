@@ -7,6 +7,25 @@ import { getUserById } from '../data/users';
 export default function LineupCard({ lineup, navigation }) {
   const [imageLoading, setImageLoading] = useState(true);
 
+  // When no lineup is provided (e.g., empty Following state), show a friendly CTA instead of erroring
+  if (!lineup) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="people-outline" size={48} color="#FF6800" />
+        <Text style={styles.emptyTitle}>No creators followed yet</Text>
+        <Text style={styles.emptySubtitle}>
+          Follow creators to see their lineups here.
+        </Text>
+        <TouchableOpacity
+          style={styles.emptyButton}
+          onPress={() => navigation?.navigate?.('Hot')}
+        >
+          <Text style={styles.emptyButtonText}>Explore hot lineups</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   // Get creator info
   const creator = getUserById(lineup.creatorId);
 
@@ -147,5 +166,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 4,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+    marginHorizontal: 16,
+  },
+  emptyTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    marginTop: 12,
+  },
+  emptySubtitle: {
+    color: '#aaa',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 6,
+  },
+  emptyButton: {
+    marginTop: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#FF6800',
+    borderRadius: 8,
+  },
+  emptyButtonText: {
+    color: '#fff',
+    fontWeight: '700',
   },
 });
