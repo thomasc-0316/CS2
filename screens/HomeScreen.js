@@ -8,9 +8,10 @@ import { useFollow } from '../context/FollowContext';
 import { useUpvotes } from '../context/UpvoteContext';
 import CreatorDiscovery from '../components/CreatorDiscovery';
 import LineupCard from '../components/LineupCard';
+import HotScreen from './HotScreen';
 
-export default function HomeScreen({ navigation }) {
-  const [activeTab, setActiveTab] = useState('explore'); // 'explore' or 'following'
+export default function HomeScreen({ navigation, route }) {
+  const [activeTab, setActiveTab] = useState('explore'); // 'explore' | 'following' | 'hot'
   const [filter, setFilter] = useState('all'); // 'all', 'active', 'reserve'
   const [followingFilters, setFollowingFilters] = useState({
     map: 'all',
@@ -30,6 +31,14 @@ export default function HomeScreen({ navigation }) {
   const followingUserIds = followingUsers.map(user => user.id);
   const followingPlayerIds = followingUsers.map(user => user.playerID).filter(Boolean);
   const isFollowingAnyone = followingUserIds.length > 0;
+
+  useEffect(() => {
+    const desiredTab = route?.params?.startTab;
+    if (desiredTab) {
+      setActiveTab(desiredTab);
+      navigation?.setParams?.({ startTab: null });
+    }
+  }, [route?.params?.startTab]);
 
   // Fetch lineups from followed creators
   useEffect(() => {
@@ -235,11 +244,17 @@ export default function HomeScreen({ navigation }) {
     );
   };
 
+  const renderHotContent = () => (
+    <View style={{ flex: 1 }}>
+      <HotScreen navigation={navigation} />
+    </View>
+  );
+
   // Render Following Tab Content
   const renderFollowingContent = () => {
     if (!isFollowingAnyone) {
       // Show Creator Discovery when not following anyone
-      return <CreatorDiscovery navigation={navigation} />;
+      return <CreatorDiscovery navigation={navigation} onExploreHot={() => setActiveTab('hot')} />;
     }
 
     if (loading) {
@@ -629,6 +644,15 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
 
           <TouchableOpacity
+            style={[styles.headerTab, activeTab === 'hot' && styles.headerTabActive]}
+            onPress={() => setActiveTab('hot')}
+          >
+            <Text style={[styles.headerTabText, activeTab === 'hot' && styles.headerTabTextActive]}>
+              Hot
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.headerTab, activeTab === 'explore' && styles.headerTabActive]}
             onPress={() => setActiveTab('explore')}
           >
@@ -644,50 +668,52 @@ export default function HomeScreen({ navigation }) {
       </View>
 
       {/* Content based on active tab */}
-      {activeTab === 'following' ? (
-        renderFollowingContent()
-      ) : (
-        <>
-          {/* Map Filter Toggle */}
-          <View style={styles.toggleContainer}>
-            <TouchableOpacity
-              style={[styles.toggleButton, filter === 'all' && styles.toggleButtonActive]}
-              onPress={() => setFilter('all')}
-            >
-              <Text style={[styles.toggleText, filter === 'all' && styles.toggleTextActive]}>
-                All
-              </Text>
-            </TouchableOpacity>
+      {activeTab === 'following'
+        ? renderFollowingContent()
+        : activeTab === 'hot'
+          ? renderHotContent()
+          : (
+            <>
+              {/* Map Filter Toggle */}
+              <View style={styles.toggleContainer}>
+                <TouchableOpacity
+                  style={[styles.toggleButton, filter === 'all' && styles.toggleButtonActive]}
+                  onPress={() => setFilter('all')}
+                >
+                  <Text style={[styles.toggleText, filter === 'all' && styles.toggleTextActive]}>
+                    All
+                  </Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.toggleButton, filter === 'active' && styles.toggleButtonActive]}
-              onPress={() => setFilter('active')}
-            >
-              <Text style={[styles.toggleText, filter === 'active' && styles.toggleTextActive]}>
-                Active Duty
-              </Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.toggleButton, filter === 'active' && styles.toggleButtonActive]}
+                  onPress={() => setFilter('active')}
+                >
+                  <Text style={[styles.toggleText, filter === 'active' && styles.toggleTextActive]}>
+                    Active Duty
+                  </Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.toggleButton, filter === 'reserve' && styles.toggleButtonActive]}
-              onPress={() => setFilter('reserve')}
-            >
-              <Text style={[styles.toggleText, filter === 'reserve' && styles.toggleTextActive]}>
-                Reserve
-              </Text>
-            </TouchableOpacity>
-          </View>
+                <TouchableOpacity
+                  style={[styles.toggleButton, filter === 'reserve' && styles.toggleButtonActive]}
+                  onPress={() => setFilter('reserve')}
+                >
+                  <Text style={[styles.toggleText, filter === 'reserve' && styles.toggleTextActive]}>
+                    Reserve
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-          {/* Map Grid */}
-          <FlatList
-            data={filteredMaps}
-            renderItem={renderMapCard}
-            keyExtractor={(item) => item.id.toString()}
-            numColumns={2}
-            contentContainerStyle={styles.grid}
-          />
-        </>
-      )}
+              {/* Map Grid */}
+              <FlatList
+                data={filteredMaps}
+                renderItem={renderMapCard}
+                keyExtractor={(item) => item.id.toString()}
+                numColumns={2}
+                contentContainerStyle={styles.grid}
+              />
+            </>
+          )}
     </View>
   );
 }
