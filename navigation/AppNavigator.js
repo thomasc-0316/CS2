@@ -9,10 +9,12 @@ import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import HomeScreen from '../screens/HomeScreen';
 import LineupGridScreen from '../screens/LineupGridScreen';
 import LineupDetailScreen from '../screens/LineupDetailScreen';
-import HotScreen from '../screens/HotScreen';
 import PostScreen from '../screens/PostScreen';
 import PreviewPostScreen from '../screens/PreviewPostScreen';
-import TacticsScreen from '../screens/TacticsScreen';
+import TacticsHubScreen from '../screens/TacticsHubScreen';
+import TacticDetailScreen from '../screens/TacticDetailScreen';
+import TacticsMapSelectScreen from '../screens/TacticsMapSelectScreen';
+import RoomScreen from '../screens/RoomScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import SearchLineupsScreen from '../screens/SearchLineupsScreen';
@@ -87,16 +89,28 @@ function HomeStack() {
   );
 }
 
-// Hot Stack
-function HotStack() {
+// Tactics Stack (explore + detail)
+function TacticsStack() {
   return (
-    <Stack.Navigator
-      screenOptions={commonStackOptions}
-    >
+    <Stack.Navigator screenOptions={commonStackOptions}>
       <Stack.Screen
-        name="HotMain"
-        component={HotScreen}
-        options={{ title: '🔥 Hot Lineups' }}
+        name="TacticsMapSelect"
+        component={TacticsMapSelectScreen}
+        options={{ title: 'Tactics' }}
+      />
+      <Stack.Screen
+        name="TacticsMain"
+        component={TacticsHubScreen}
+        options={({ route }) => ({
+          title: route.params?.map?.name || 'Tactics'
+        })}
+      />
+      <Stack.Screen
+        name="TacticDetail"
+        component={TacticDetailScreen}
+        options={({ route }) => ({
+          title: route.params?.tactic?.title || 'Tactic'
+        })}
       />
       <Stack.Screen
         name="LineupDetail"
@@ -108,6 +122,13 @@ function HotStack() {
         component={UserProfileScreen}
         options={({ route }) => ({
           title: route.params?.username || 'User Profile'
+        })}
+      />
+      <Stack.Screen
+        name="LineupGrid"
+        component={LineupGridScreen}
+        options={({ route }) => ({
+          title: route.params?.map?.name || 'Lineups'
         })}
       />
     </Stack.Navigator>
@@ -190,16 +211,16 @@ export default function AppNavigator() {
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Hot') {
-            iconName = focused ? 'flame' : 'flame-outline';
+          } else if (route.name === 'Tactics') {
+            iconName = focused ? 'layers' : 'layers-outline';
           } else if (route.name === 'Post') {
             return (
               <View style={styles.postButton}>
                 <Ionicons name="add" size={28} color="#fff" />
               </View>
             );
-          } else if (route.name === 'Tactics') {
-            iconName = focused ? 'book' : 'book-outline';
+          } else if (route.name === 'Room') {
+            iconName = focused ? 'people' : 'people-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person-circle' : 'person-circle-outline';
           }
@@ -227,8 +248,8 @@ export default function AppNavigator() {
         options={{ headerShown: false }}
       />
       <Tab.Screen 
-        name="Hot" 
-        component={HotStack}
+        name="Tactics" 
+        component={TacticsStack}
         options={{ headerShown: false }}
       />
       <Tab.Screen 
@@ -240,8 +261,8 @@ export default function AppNavigator() {
         }}
       />
       <Tab.Screen 
-        name="Tactics" 
-        component={TacticsScreen}
+        name="Room" 
+        component={RoomScreen}
         options={{ headerShown: false }}
       />
       <Tab.Screen 

@@ -4,8 +4,19 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { getUserById } from '../data/users';
 
-export default function LineupCard({ lineup, navigation }) {
+export default function CreatorDiscovery({ lineup, navigation, onExploreHot }) {
   const [imageLoading, setImageLoading] = useState(true);
+
+  const handleExplorePress = () => {
+    if (onExploreHot) {
+      onExploreHot();
+      return;
+    }
+    navigation?.navigate?.('Home', {
+      screen: 'HomeMain',
+      params: { startTab: 'hot' },
+    });
+  };
 
   // When no lineup is provided (e.g., empty Following state), show a friendly CTA instead of erroring
   if (!lineup) {
@@ -16,10 +27,7 @@ export default function LineupCard({ lineup, navigation }) {
         <Text style={styles.emptySubtitle}>
           Follow creators to see their lineups here.
         </Text>
-        <TouchableOpacity
-          style={styles.emptyButton}
-          onPress={() => navigation?.navigate?.('Hot')}
-        >
+        <TouchableOpacity style={styles.emptyButton} onPress={handleExplorePress}>
           <Text style={styles.emptyButtonText}>Explore hot lineups</Text>
         </TouchableOpacity>
       </View>

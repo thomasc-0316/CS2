@@ -1,5 +1,25 @@
 export const TACTICS = [
   {
+    id: 'dust2_textbook_t_exec',
+    mapId: 'dust2',
+    side: 'T',
+    category: 'default',
+    title: 'Dust II - Textbook A hit',
+    description: 'Core long / cat utility for an A take using textbook lineups.',
+    lineupIds: [],
+    tags: ['textbook'],
+  },
+  {
+    id: 'dust2_textbook_ct_lock',
+    mapId: 'dust2',
+    side: 'CT',
+    category: 'default',
+    title: 'Dust II - Textbook long lockdown',
+    description: 'Anchor-friendly long denial with the default textbook smokes and mollies.',
+    lineupIds: [],
+    tags: ['textbook'],
+  },
+  {
     id: 'dust2_default_a_split',
     mapId: 'dust2',
     side: 'T',
@@ -7,6 +27,7 @@ export const TACTICS = [
     title: 'Dust II - A Split Default',
     description: 'Standard long / cat control that sets up an A split with essential smokes.',
     lineupIds: [1, 2, 3, 4],
+    tags: ['default'],
   },
   {
     id: 'dust2_fast_b',
@@ -16,15 +37,7 @@ export const TACTICS = [
     title: 'Dust II - Fast B Hit',
     description: 'Burst B with doors control and flashes to overwhelm the site anchor.',
     lineupIds: [3, 5],
-  },
-  {
-    id: 'dust2_ct_long_lock',
-    mapId: 'dust2',
-    side: 'CT',
-    category: 'default',
-    title: 'Dust II - Long Lockdown',
-    description: 'Lock long early with door smoke and supportive utility to stall the push.',
-    lineupIds: [11, 12, 15],
+    tags: ['default'],
   },
   {
     id: 'dust2_mid_b_contact',
@@ -34,6 +47,27 @@ export const TACTICS = [
     title: 'Dust II - Mid to B Contact',
     description: 'Players-preferred mid to B contact with quick smokes and flashes.',
     lineupIds: [3, 4, 5],
+    tags: ['personal'],
+  },
+  {
+    id: 'mirage_textbook_a_exec',
+    mapId: 'mirage',
+    side: 'T',
+    category: 'default',
+    title: 'Mirage - Textbook A exec',
+    description: 'Textbook A site smokes plus supporting flashes to enter as a pack.',
+    lineupIds: [],
+    tags: ['textbook'],
+  },
+  {
+    id: 'mirage_textbook_ct_retakes',
+    mapId: 'mirage',
+    side: 'CT',
+    category: 'default',
+    title: 'Mirage - Textbook retake kit',
+    description: 'CT-side retake utility pulled from the textbook lineup set.',
+    lineupIds: [],
+    tags: ['textbook'],
   },
   {
     id: 'mirage_a_exec',
@@ -43,6 +77,7 @@ export const TACTICS = [
     title: 'Mirage - Full A Execute',
     description: 'Classic Mirage execute smoking CT plus mollies and flashes to take site.',
     lineupIds: [16, 17, 18],
+    tags: ['default'],
   },
   {
     id: 'mirage_mid_default',
@@ -52,5 +87,6 @@ export const TACTICS = [
     title: 'Mirage - Mid Default',
     description: 'Take mid control before splitting to connector / cat.',
     lineupIds: [20, 21, 22],
+    tags: ['personal'],
   },
 ];

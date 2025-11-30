@@ -25,7 +25,7 @@ const PHASES = {
   EXECUTION: 'EXECUTION',
 };
 
-export default function TacticsScreen() {
+export default function RoomScreen() {
   const {
     user,
     room,
@@ -154,11 +154,20 @@ export default function TacticsScreen() {
   }, [room?.activeTacticId]);
 
   const selectionLineups = useMemo(() => {
-    if (!activeTactic) return [];
+    if (!activeTactic || !Array.isArray(activeTactic.lineupIds)) return [];
+    if (!activeTactic.lineupIds.length) {
+      return mapLineups.filter(
+        (lineup) => (lineup.side || '').toUpperCase() === tacticSide.toUpperCase(),
+      );
+    }
     return activeTactic.lineupIds
-      .map((lineupId) => lineupsById[lineupId])
+      .map((lineupId) => (
+        lineupsById[lineupId] ||
+        lineupsById[String(lineupId)] ||
+        lineupsById[Number(lineupId)]
+      ))
       .filter(Boolean);
-  }, [activeTactic, lineupsById]);
+  }, [activeTactic, lineupsById, mapLineups, tacticSide]);
 
   const tacticVotes = room?.tacticVotes || {};
   const myVote = useMemo(() => {
@@ -177,7 +186,10 @@ export default function TacticsScreen() {
     const grouped = {};
     Object.entries(room.grenadeSelections || {}).forEach(
       ([grenadeId, uid]) => {
-        const lineup = lineupsById[Number(grenadeId)];
+        const lineup =
+          lineupsById[grenadeId] ||
+          lineupsById[String(grenadeId)] ||
+          lineupsById[Number(grenadeId)];
         if (!lineup) return;
         if (!grouped[uid]) grouped[uid] = [];
         grouped[uid].push(lineup);
@@ -419,7 +431,7 @@ export default function TacticsScreen() {
       style={styles.screen}
       contentContainerStyle={styles.landingContainer}
     >
-      <Text style={styles.heading}>Tactics Room</Text>
+      <Text style={styles.heading}>Room</Text>
       <Text style={styles.subheading}>
         Create a room as the IGL or join using a 6-digit code.
       </Text>
@@ -1132,5 +1144,3 @@ const styles = StyleSheet.create({
     opacity: 0.95,
   },
 });
-
-
