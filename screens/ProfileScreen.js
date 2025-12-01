@@ -7,24 +7,22 @@ import { useFavorites } from '../context/FavoritesContext';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useDrafts } from '../context/DraftsContext';
 import { useFollow } from '../context/FollowContext';
-import { useAuth } from '../context/AuthContext';  // ADD THIS
+import { useAuth } from '../context/AuthContext';
 import { useProfile } from '../context/ProfileContext';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
 import FollowersFollowingModal from '../components/FollowersFollowingModal';
+import { deleteLineupPost } from '../services/postService';
 
 // Draft card component
-function DraftCard({ item, navigation, onDelete }) {
+function DraftCard({ item, navigation, onDelete, onEdit }) {
   const [imageLoading, setImageLoading] = useState(true);
 
   return (
     <TouchableOpacity
       style={styles.lineupCard}
-      onPress={() => {
-        // TODO: Navigate to edit draft
-        console.log('Edit draft:', item.id);
-      }}
+      onPress={() => onEdit(item)}
       onLongPress={() => onDelete(item.id)}
     >
       <Image
@@ -49,6 +47,28 @@ function DraftCard({ item, navigation, onDelete }) {
         <Text style={styles.draftBadgeText}>Draft</Text>
       </View>
 
+      {/* Edit/Delete buttons for drafts */}
+      <View style={styles.cardActions}>
+        <TouchableOpacity
+          style={styles.cardActionButton}
+          onPress={(e) => {
+            e.stopPropagation();
+            onEdit(item);
+          }}
+        >
+          <Ionicons name="create-outline" size={18} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.cardActionButton, styles.deleteButton]}
+          onPress={(e) => {
+            e.stopPropagation();
+            onDelete(item.id);
+          }}
+        >
+          <Ionicons name="trash-outline" size={18} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.cardInfo}>
         <Text style={styles.cardTitle} numberOfLines={1}>{item.title || 'Untitled'}</Text>
         <View style={styles.tags}>
@@ -65,7 +85,7 @@ function DraftCard({ item, navigation, onDelete }) {
 }
 
 // Lineup card component
-function LineupCard({ item, navigation, getMapName, getUpvoteCount }) {
+function LineupCard({ item, navigation, getMapName, getUpvoteCount, canEdit, onEdit, onDelete }) {
   const [imageLoading, setImageLoading] = useState(true);
 
   return (
@@ -95,6 +115,30 @@ function LineupCard({ item, navigation, getMapName, getUpvoteCount }) {
         </View>
       )}
 
+      {/* Edit/Delete buttons for user's own posts */}
+      {canEdit && (
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={styles.cardActionButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              onEdit(item);
+            }}
+          >
+            <Ionicons name="create-outline" size={18} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.cardActionButton, styles.deleteButton]}
+            onPress={(e) => {
+              e.stopPropagation();
+              onDelete(item);
+            }}
+          >
+            <Ionicons name="trash-outline" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.cardInfo}>
         <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
         <Text style={styles.mapName}>{getMapName(item.mapId)}</Text>
@@ -120,10 +164,10 @@ export default function ProfileScreen() {
   const { getUpvoteCount } = useUpvotes();
   const { drafts, deleteDraft } = useDrafts();
   const { getFollowingCount, getFollowersCount } = useFollow();
-  const { currentUser, logout, updateUserProfile } = useAuth();  // ADD THIS - Get current user and logout
+  const { currentUser, logout, updateUserProfile } = useAuth();
   const { profile: storedProfile, updateProfile: updateLocalProfile } = useProfile();
   
-  const [activeTab, setActiveTab] = useState('favorites');
+  const [activeTab, setActiveTab] = useState('myLineups');
   const [followModalVisible, setFollowModalVisible] = useState(false);
   const [followModalTab, setFollowModalTab] = useState('followers');
   const [refreshing, setRefreshing] = useState(false);
@@ -162,8 +206,6 @@ export default function ProfileScreen() {
   useEffect(() => {
     const fetchData = async () => {
       if (currentUser && activeTab === 'myLineups') {
-        if (!currentUser) return;
-
         try {
           setLoading(true);
           const q = query(
@@ -203,6 +245,7 @@ export default function ProfileScreen() {
       if (activeTab === 'favorites') {
         if (favoriteIds.length === 0) {
           setFavoriteLineups([]);
+          setLoading(false);
           return;
         }
 
@@ -247,7 +290,6 @@ export default function ProfileScreen() {
     fetchData();
   }, [activeTab, favoriteIds.length]);
 
-
   // Calculate total upvotes received on user's posts
   const totalUpvotesReceived = myLineups.reduce((total, lineup) => {
     return total + getUpvoteCount(lineup);
@@ -268,6 +310,56 @@ export default function ProfileScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => deleteDraft(draftId),
+        },
+      ]
+    );
+  };
+
+  const handleEditDraft = (draft) => {
+    // Navigate to PostScreen with draft data pre-filled
+    navigation.navigate('Post', {
+      screen: 'PostMain',
+      params: {
+        loadDraft: draft,
+      },
+    });
+  };
+
+  const handleEditLineup = async (lineup) => {
+    // Navigate to PostScreen with lineup data for editing
+    navigation.navigate('Post', {
+      screen: 'PostMain',
+      params: {
+        editLineup: lineup,
+      },
+    });
+  };
+
+  const handleDeleteLineup = async (lineup) => {
+    Alert.alert(
+      'Delete Lineup',
+      'Are you sure you want to delete this lineup? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteLineupPost(lineup.id, currentUser);
+              
+              // Remove from local state
+              setMyLineups(prev => prev.filter(item => item.id !== lineup.id));
+              
+              Alert.alert('Success', 'Lineup deleted successfully');
+            } catch (error) {
+              console.error('Error deleting lineup:', error);
+              Alert.alert(
+                'Delete Failed',
+                error.message || 'Failed to delete lineup. Please try again.'
+              );
+            }
+          },
         },
       ]
     );
@@ -469,14 +561,28 @@ export default function ProfileScreen() {
 
   const renderItem = ({ item }) => {
     if (activeTab === 'drafts') {
-      return <DraftCard item={item} navigation={navigation} onDelete={handleDeleteDraft} />;
+      return (
+        <DraftCard
+          item={item}
+          navigation={navigation}
+          onDelete={handleDeleteDraft}
+          onEdit={handleEditDraft}
+        />
+      );
     }
+    
+    // For myLineups, allow edit/delete
+    const canEdit = activeTab === 'myLineups';
+    
     return (
       <LineupCard
         item={item}
         navigation={navigation}
         getMapName={getMapName}
         getUpvoteCount={getUpvoteCount}
+        canEdit={canEdit}
+        onEdit={handleEditLineup}
+        onDelete={handleDeleteLineup}
       />
     );
   };
@@ -510,10 +616,6 @@ export default function ProfileScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
 
-    // Trigger a re-fetch by setting a refresh key or just wait a bit
-    // The useEffects will handle the actual fetching based on activeTab
-    await new Promise(resolve => setTimeout(resolve, 100));
-
     // Re-trigger the appropriate useEffect
     if (activeTab === 'myLineups' && currentUser) {
       try {
@@ -535,44 +637,6 @@ export default function ProfileScreen() {
         setMyLineups(lineups);
       } catch (error) {
         console.error('Error refreshing lineups:', error);
-        Alert.alert(
-          'Refresh Failed',
-          'Could not refresh your lineups. Please try again.',
-          [{ text: 'OK' }]
-        );
-      }
-    } else if (activeTab === 'favorites' && favoriteIds.length > 0) {
-      try {
-        const stringIds = favoriteIds.map(id => id.toString());
-        const batches = [];
-        for (let i = 0; i < stringIds.length; i += 10) {
-          const batch = stringIds.slice(i, i + 10);
-          batches.push(batch);
-        }
-
-        const allLineups = [];
-        for (const batch of batches) {
-          const q = query(
-            collection(db, 'lineups'),
-            where('__name__', 'in', batch)
-          );
-
-          const snapshot = await getDocs(q);
-          const lineups = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          allLineups.push(...lineups);
-        }
-
-        setFavoriteLineups(allLineups);
-      } catch (error) {
-        console.error('Error refreshing favorites:', error);
-        Alert.alert(
-          'Refresh Failed',
-          'Could not refresh your favorites. Please try again.',
-          [{ text: 'OK' }]
-        );
       }
     }
 
@@ -587,75 +651,69 @@ export default function ProfileScreen() {
         keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         ListHeaderComponent={renderHeader}
-        ListEmptyComponent={renderEmptyState}
+        ListEmptyComponent={loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FF6800" />
+          </View>
+        ) : renderEmptyState()}
         contentContainerStyle={styles.grid}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        windowSize={5}
-        initialNumToRender={6}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor="#FF6800"
             colors={['#FF6800']}
-            progressBackgroundColor="#3a3a3a"
           />
         }
       />
 
-      {/* Followers/Following Modal */}
       <FollowersFollowingModal
         visible={followModalVisible}
         onClose={() => setFollowModalVisible(false)}
+        userId={currentUser?.uid}
         initialTab={followModalTab}
       />
     </View>
   );
 }
 
-// ... keep all your existing styles exactly as they are
 const styles = StyleSheet.create({
-  // ... (paste all your existing styles here - they stay the same)
   container: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#0a0a0a',
   },
   profileHeader: {
-    padding: 15,
+    padding: 20,
     backgroundColor: '#1a1a1a',
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 15,
   },
   avatarContainer: {
-    marginRight: 12,
+    marginRight: 15,
   },
   profilePicture: {
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: '#3a3a3a',
   },
   userInfoContainer: {
     flex: 1,
   },
   username: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   playerID: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#999',
   },
   bioContainer: {
-    width: '100%',
-    marginBottom: 12,
-    paddingVertical: 6,
+    marginBottom: 15,
   },
   bioText: {
     fontSize: 14,
@@ -760,42 +818,39 @@ const styles = StyleSheet.create({
     width: '47%',
     margin: 5,
     backgroundColor: '#1a1a1a',
-    borderRadius: 10,
+    borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
   },
   cardImage: {
     width: '100%',
-    height: 120,
-    backgroundColor: '#3a3a3a',
+    height: 140,
+    backgroundColor: '#2a2a2a',
   },
   imageLoadingContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
+    height: 140,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#3a3a3a',
+    backgroundColor: '#2a2a2a',
   },
   textbookBadge: {
     position: 'absolute',
     top: 8,
-    right: 8,
-    backgroundColor: '#5E98D9',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
+    left: 8,
+    backgroundColor: '#4169E1',
+    borderRadius: 6,
+    padding: 6,
   },
   draftBadge: {
     position: 'absolute',
     top: 8,
-    right: 8,
-    backgroundColor: '#666',
-    borderRadius: 12,
+    left: 8,
+    backgroundColor: '#FF6800',
+    borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
     flexDirection: 'row',
@@ -805,13 +860,31 @@ const styles = StyleSheet.create({
   draftBadgeText: {
     color: '#fff',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: 'bold',
+  },
+  cardActions: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  cardActionButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteButton: {
+    backgroundColor: 'rgba(220, 38, 38, 0.8)',
   },
   cardInfo: {
     padding: 10,
   },
   cardTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 4,
@@ -828,13 +901,12 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   tag: {
-    backgroundColor: '#4a4a4a',
+    backgroundColor: '#2a2a2a',
     paddingHorizontal: 6,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 4,
     fontSize: 10,
     color: '#fff',
-    fontWeight: '600',
   },
   upvoteContainer: {
     flexDirection: 'row',
@@ -850,18 +922,18 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
+  loadingContainer: {
+    padding: 40,
     alignItems: 'center',
-    paddingTop: 80,
-    paddingHorizontal: 40,
+  },
+  emptyState: {
+    padding: 60,
+    alignItems: 'center',
+    gap: 15,
   },
   emptyText: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginTop: 20,
-    lineHeight: 24,
   },
 });

@@ -1,28 +1,90 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useDrafts } from '../context/DraftsContext';
+import { useAuth } from '../context/AuthContext';
+import { createLineupPost, updateLineupPost } from '../services/postService';
 
 export default function PreviewPostScreen({ route, navigation }) {
-  const { postData } = route.params;
+  const { postData, isEditing, lineupId } = route.params;
   const { saveDraft } = useDrafts();
+  const { currentUser } = useAuth();
+  const [posting, setPosting] = useState(false);
 
-  const handlePost = () => {
-    // TODO: Implement actual posting logic (save to database/backend)
-    Alert.alert(
-      'Success!',
-      'Your lineup has been posted!',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Navigate back to Post screen and reset it, then go to home
-            navigation.navigate('PostMain', { shouldReset: true });
-            navigation.navigate('Home');
-          },
-        },
-      ]
-    );
+  const handlePost = async () => {
+    if (posting) return;
+    
+    setPosting(true);
+    
+    try {
+      if (isEditing) {
+        // Update existing post
+        await updateLineupPost(lineupId, postData, currentUser);
+        
+        setPosting(false);
+        
+        Alert.alert(
+          'Success!',
+          'Your lineup has been updated!',
+          [
+            {
+              text: 'View Post',
+              onPress: () => {
+                navigation.navigate('Home');
+                // Navigate to the updated post after a short delay
+                setTimeout(() => {
+                  navigation.navigate('LineupDetail', { lineupId });
+                }, 100);
+              },
+            },
+            {
+              text: 'OK',
+              onPress: () => {
+                navigation.navigate('Profile');
+              },
+            },
+          ]
+        );
+      } else {
+        // Create new post
+        const newLineupId = await createLineupPost(postData, currentUser);
+        
+        setPosting(false);
+        
+        Alert.alert(
+          'Success!',
+          'Your lineup has been posted!',
+          [
+            {
+              text: 'View Post',
+              onPress: () => {
+                navigation.navigate('Home');
+                // Navigate to the new post after a short delay
+                setTimeout(() => {
+                  navigation.navigate('LineupDetail', { lineupId: newLineupId });
+                }, 100);
+              },
+            },
+            {
+              text: 'Post Another',
+              onPress: () => {
+                navigation.navigate('PostMain', { shouldReset: true });
+              },
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      setPosting(false);
+      console.error('Error posting/updating lineup:', error);
+      
+      Alert.alert(
+        isEditing ? 'Update Failed' : 'Post Failed',
+        error.message || `Failed to ${isEditing ? 'update' : 'post'} your lineup. Please try again.`,
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleSaveDraft = () => {
@@ -56,17 +118,31 @@ export default function PreviewPostScreen({ route, navigation }) {
         <Text style={styles.headerTitle}>Preview</Text>
         
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.draftButton} onPress={handleSaveDraft}>
+          <TouchableOpacity 
+            style={styles.draftButton} 
+            onPress={handleSaveDraft}
+            disabled={posting}
+          >
             <Ionicons name="bookmark-outline" size={20} color="#fff" />
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.postButton} onPress={handlePost}>
-            <Text style={styles.postButtonText}>Post</Text>
+          <TouchableOpacity 
+            style={[styles.postButton, posting && styles.postButtonDisabled]} 
+            onPress={handlePost}
+            disabled={posting}
+          >
+            {posting ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.postButtonText}>
+                {isEditing ? 'Update' : 'Post'}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Preview Content - Same layout as LineupDetailScreen */}
+      {/* Preview Content */}
       <ScrollView style={styles.content}>
         {/* Header Info */}
         <View style={styles.postHeader}>
@@ -98,26 +174,26 @@ export default function PreviewPostScreen({ route, navigation }) {
         {/* Image 1: Where to Stand */}
         <View style={styles.imageSection}>
           <Text style={styles.imageTitle}>1. Where to Stand</Text>
-          <Image source={{ uri: postData.standImage }} style={styles.image} />
+          <Image source={{ uri: postData.standImage }} style={styles.image} contentFit="cover" />
         </View>
 
         {/* Image 2: Where to Aim */}
         <View style={styles.imageSection}>
           <Text style={styles.imageTitle}>2. Where to Aim</Text>
-          <Image source={{ uri: postData.aimImage }} style={styles.image} />
+          <Image source={{ uri: postData.aimImage }} style={styles.image} contentFit="cover" />
         </View>
 
         {/* Image 3: Where It Lands */}
         <View style={styles.imageSection}>
           <Text style={styles.imageTitle}>3. Where It Lands</Text>
-          <Image source={{ uri: postData.landImage }} style={styles.image} />
+          <Image source={{ uri: postData.landImage }} style={styles.image} contentFit="cover" />
         </View>
 
-        {/* Optional: Third Person View */}
-        {postData.thirdPersonImage && (
+        {/* Optional: More Details */}
+        {(postData.moreDetailsImage || postData.thirdPersonImage) && (
           <View style={styles.imageSection}>
-            <Text style={styles.imageTitle}>4. Third Person View</Text>
-            <Image source={{ uri: postData.thirdPersonImage }} style={styles.image} />
+            <Text style={styles.imageTitle}>4. More Details</Text>
+            <Image source={{ uri: postData.moreDetailsImage || postData.thirdPersonImage }} style={styles.image} contentFit="cover" />
           </View>
         )}
 
@@ -172,6 +248,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  postButtonDisabled: {
+    opacity: 0.6,
   },
   postButtonText: {
     color: '#fff',
@@ -252,7 +333,7 @@ const styles = StyleSheet.create({
   },
   image: {
     width: '100%',
-    height: 400,
+    aspectRatio: 16 / 9,
     borderRadius: 12,
     backgroundColor: '#2a2a2a',
   },

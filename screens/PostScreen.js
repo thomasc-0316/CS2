@@ -17,62 +17,203 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
+import { useAutoSave } from '../hooks/useAutoSave';
+import { useUndoRedo } from '../hooks/useUndoRedo';
+import AutoSaveIndicator from '../components/AutoSaveIndicator';
+import ImageCropModal from '../components/ImageCropModal';
+import DraftSelectionModal from '../components/DraftSelectionModal';
+import { useDrafts } from '../context/DraftsContext';
 
 export default function PostScreen({ navigation, route }) {
-  // Form state
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [side, setSide] = useState('');
-  const [site, setSite] = useState('');
-  const [nadeType, setNadeType] = useState('');
-  const [throwInstructions, setThrowInstructions] = useState('');
+  const { createNewDraft, deleteDraftAfterPost, currentDraftId, loadDraft } = useDrafts();
+  
+  // Track if we're working with a loaded draft
+  const [loadedDraftId, setLoadedDraftId] = useState(null);
+  // Undo/Redo state management for form
+  const {
+    state: formState,
+    setState: setFormState,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    clearHistory,
+  } = useUndoRedo({
+    title: '',
+    description: '',
+    side: '',
+    site: '',
+    nadeType: '',
+    throwInstructions: '',
+    standImage: null,
+    aimImage: null,
+    landImage: null,
+    moreDetailsImage: null,
+  });
 
-  // Image state
-  const [standImage, setStandImage] = useState(null);
-  const [aimImage, setAimImage] = useState(null);
-  const [landImage, setLandImage] = useState(null);
-  const [thirdPersonImage, setThirdPersonImage] = useState(null);
+  // Destructure form state
+  const {
+    title,
+    description,
+    side,
+    site,
+    nadeType,
+    throwInstructions,
+    standImage,
+    aimImage,
+    landImage,
+    moreDetailsImage,
+  } = formState;
+
+  // Helper to update form state
+  const updateFormState = (updates) => {
+    setFormState({ ...formState, ...updates });
+  };
+
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingLineupId, setEditingLineupId] = useState(null);
+
+  // Image crop modal state
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [cropImageUri, setCropImageUri] = useState(null);
+  const [cropImageSlot, setCropImageSlot] = useState(null);
+
+  // Draft selection modal state
+  const [showDraftModal, setShowDraftModal] = useState(false);
+
+  // Auto-save (enabled only when not editing)
+  const { saveStatus, lastSaved } = useAutoSave(formState, !isEditMode);
+
+  // Load draft or lineup for editing
+  useEffect(() => {
+    if (route.params?.loadDraft) {
+      const draft = route.params.loadDraft;
+      setLoadedDraftId(draft.id); // Track which draft we loaded
+      setFormState({
+        title: draft.title || '',
+        description: draft.description || '',
+        side: draft.side || '',
+        site: draft.site || '',
+        nadeType: draft.nadeType || '',
+        throwInstructions: draft.throwInstructions || '',
+        standImage: draft.standImage || null,
+        aimImage: draft.aimImage || null,
+        landImage: draft.landImage || null,
+        moreDetailsImage: draft.moreDetailsImage || draft.thirdPersonImage || null,
+      });
+      clearHistory();
+
+      // Clear the param
+      navigation.setParams({ loadDraft: undefined });
+    } else if (route.params?.editLineup) {
+      const lineup = route.params.editLineup;
+      setIsEditMode(true);
+      setEditingLineupId(lineup.id);
+      setFormState({
+        title: lineup.title || '',
+        description: lineup.description || '',
+        side: lineup.side || '',
+        site: lineup.site || '',
+        nadeType: lineup.nadeType || '',
+        throwInstructions: lineup.throwInstructions || '',
+        standImage: lineup.standImage || null,
+        aimImage: lineup.aimImage || null,
+        landImage: lineup.landImage || null,
+        moreDetailsImage: lineup.moreDetailsImage || lineup.thirdPersonImage || null,
+      });
+      clearHistory();
+
+      // Update header title
+      navigation.setOptions({
+        title: 'Edit Lineup',
+      });
+
+      // Clear the param
+      navigation.setParams({ editLineup: undefined });
+    }
+  }, [route.params?.loadDraft, route.params?.editLineup]);
+
+  // Show draft selection modal on tab focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Always show modal when navigating to Post tab (unless editing)
+      if (!isEditMode && !route.params?.loadDraft && !route.params?.editLineup) {
+        // Small delay to let navigation finish
+        setTimeout(() => {
+          setShowDraftModal(true);
+        }, 100);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, isEditMode]);
 
   // Function to reset all fields
   const resetForm = () => {
-    setTitle('');
-    setDescription('');
-    setSide('');
-    setSite('');
-    setNadeType('');
-    setThrowInstructions('');
-    setStandImage(null);
-    setAimImage(null);
-    setLandImage(null);
-    setThirdPersonImage(null);
+    setFormState({
+      title: '',
+      description: '',
+      side: '',
+      site: '',
+      nadeType: '',
+      throwInstructions: '',
+      standImage: null,
+      aimImage: null,
+      landImage: null,
+      moreDetailsImage: null,
+    });
     setActiveImageSlot(null);
     setSelectedPhoto(null);
+    setIsEditMode(false);
+    setEditingLineupId(null);
+    setLoadedDraftId(null); // Clear loaded draft
+    clearHistory();
+
+    // Reset header title
+    navigation.setOptions({
+      title: 'Create Lineup',
+    });
   };
 
-  // Check if we should reset after posting
-  useEffect(() => {
-    if (route.params?.shouldReset) {
-      resetForm();
-      // Clear the param
-      navigation.setParams({ shouldReset: undefined });
-    }
-  }, [route.params?.shouldReset]);
-
-  // Set up header right button
+  // Set up header buttons (Reset + Undo/Redo)
   useEffect(() => {
     navigation.setOptions({
+      headerLeft: () => (
+        <View style={styles.headerLeft}>
+          <TouchableOpacity
+            onPress={undo}
+            disabled={!canUndo}
+            style={[styles.undoRedoButton, !canUndo && styles.undoRedoButtonDisabled]}
+          >
+            <Ionicons
+              name="arrow-undo"
+              size={22}
+              color={canUndo ? '#FF6800' : '#666'}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={redo}
+            disabled={!canRedo}
+            style={[styles.undoRedoButton, !canRedo && styles.undoRedoButtonDisabled]}
+          >
+            <Ionicons
+              name="arrow-redo"
+              size={22}
+              color={canRedo ? '#FF6800' : '#666'}
+            />
+          </TouchableOpacity>
+        </View>
+      ),
       headerRight: () => (
-        <TouchableOpacity
-          onPress={handleReset}
-          style={{ marginRight: 10 }}
-        >
+        <TouchableOpacity onPress={handleReset} style={{ marginRight: 10 }}>
           <Ionicons name="refresh-outline" size={24} color="#fff" />
         </TouchableOpacity>
       ),
     });
-  }, [navigation]);
+  }, [navigation, canUndo, canRedo]);
 
-  // Reset all form fields and images with confirmation
+  // Reset with confirmation
   const handleReset = () => {
     Alert.alert(
       'Reset Post',
@@ -94,7 +235,7 @@ export default function PostScreen({ navigation, route }) {
   const [loadingPhotos, setLoadingPhotos] = useState(true);
 
   // Selection state
-  const [activeImageSlot, setActiveImageSlot] = useState(null); // 'stand', 'aim', 'land', 'thirdPerson'
+  const [activeImageSlot, setActiveImageSlot] = useState(null);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
 
   // Load photos from gallery
@@ -102,7 +243,6 @@ export default function PostScreen({ navigation, route }) {
     (async () => {
       try {
         const { status } = await MediaLibrary.requestPermissionsAsync();
-        console.log('Permission status:', status);
         setHasPermission(status === 'granted');
 
         if (status === 'granted') {
@@ -111,7 +251,6 @@ export default function PostScreen({ navigation, route }) {
             mediaType: 'photo',
             sortBy: ['creationTime'],
           });
-          console.log('Photos loaded:', album.assets.length);
           setPhotos(album.assets);
         }
       } catch (error) {
@@ -125,7 +264,7 @@ export default function PostScreen({ navigation, route }) {
 
   const handleImageSlotTap = (slot) => {
     setActiveImageSlot(slot);
-    setSelectedPhoto(null); // Clear any previous selection
+    setSelectedPhoto(null);
     Keyboard.dismiss();
   };
 
@@ -137,29 +276,41 @@ export default function PostScreen({ navigation, route }) {
 
   const confirmImageSelection = async () => {
     if (selectedPhoto && activeImageSlot) {
-      // Get the actual file URI (handles iOS ph:// URLs)
+      // Get the actual file URI
       const assetInfo = await MediaLibrary.getAssetInfoAsync(selectedPhoto.id);
       const imageUri = assetInfo.localUri || assetInfo.uri;
-      
-      switch (activeImageSlot) {
-        case 'stand':
-          setStandImage(imageUri);
-          break;
-        case 'aim':
-          setAimImage(imageUri);
-          break;
-        case 'land':
-          setLandImage(imageUri);
-          break;
-        case 'thirdPerson':
-          setThirdPersonImage(imageUri);
-          break;
-      }
+
+      // Store which slot this image is for
+      setCropImageSlot(activeImageSlot);
+      setCropImageUri(imageUri);
 
       // Clear selection state
       setActiveImageSlot(null);
       setSelectedPhoto(null);
+
+      // Open crop modal
+      setShowCropModal(true);
     }
+  };
+
+  // Handle cropped image confirmation
+  const handleCroppedImage = (croppedUri) => {
+    // Set the cropped image to the appropriate slot
+    const updates = {};
+    updates[`${cropImageSlot}Image`] = croppedUri;
+    updateFormState(updates);
+
+    // Close modal and clear state
+    setShowCropModal(false);
+    setCropImageUri(null);
+    setCropImageSlot(null);
+  };
+
+  // Handle crop modal cancel
+  const handleCropCancel = () => {
+    setShowCropModal(false);
+    setCropImageUri(null);
+    setCropImageSlot(null);
   };
 
   const cancelSelection = () => {
@@ -202,114 +353,132 @@ export default function PostScreen({ navigation, route }) {
         standImage,
         aimImage,
         landImage,
-        thirdPersonImage,
+        moreDetailsImage,
+        mapId: 'dust2', // Default for now
       },
+      isEditing: isEditMode,
+      lineupId: editingLineupId,
     });
   };
 
-  const renderImagePlaceholder = (slot, label, imageUri, isOptional = false) => {
-    const isActive = activeImageSlot === slot;
-    
+  const renderPickerOption = (value, label, currentValue, setValue) => {
+    const isSelected = currentValue === value;
     return (
-      <View style={styles.imageSection}>
-        <View style={styles.imageLabelRow}>
-          <Text style={styles.imageLabel}>{label}</Text>
-          {isOptional && <Text style={styles.optionalLabel}>(Optional)</Text>}
-        </View>
-        <TouchableOpacity
-          style={[
-            styles.imagePlaceholder,
-            isActive && styles.imagePlaceholderActive,
-            imageUri && styles.imagePlaceholderFilled,
-          ]}
-          onPress={() => handleImageSlotTap(slot)}
-          activeOpacity={0.7}
-        >
-          {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.placeholderImage} />
-          ) : (
-            <View style={styles.placeholderContent}>
-              <Ionicons
-                name="image-outline"
-                size={40}
-                color={isActive ? '#FF6800' : '#666'}
-              />
-              <Text style={[styles.placeholderText, isActive && styles.placeholderTextActive]}>
-                {isActive ? 'Select from gallery below' : 'Tap to add image'}
-              </Text>
-            </View>
-          )}
-          
-          {imageUri && (
-            <View style={styles.changeImageIndicator}>
-              <Ionicons name="pencil" size={16} color="#fff" />
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        key={value}
+        style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
+        onPress={() => updateFormState({ [setValue.name.replace('set', '').toLowerCase()]: value })}
+      >
+        <Text style={[styles.pickerText, isSelected && styles.pickerTextSelected]}>
+          {label}
+        </Text>
+      </TouchableOpacity>
     );
   };
 
-  const renderPickerOption = (value, label, selectedValue, onSelect) => (
-    <TouchableOpacity
-      style={[
-        styles.pickerOption,
-        selectedValue === value && styles.pickerOptionActive,
-      ]}
-      onPress={() => onSelect(value)}
-    >
-      <Text
-        style={[
-          styles.pickerOptionText,
-          selectedValue === value && styles.pickerOptionTextActive,
-        ]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  if (!hasPermission) {
+  const renderPickerOptionSimple = (value, label, currentValue, stateKey) => {
+    const isSelected = currentValue === value;
     return (
-      <View style={styles.permissionContainer}>
-        <Ionicons name="images-outline" size={80} color="#666" />
-        <Text style={styles.permissionText}>
-          Photo library access is required to post lineups
+      <TouchableOpacity
+        key={value}
+        style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
+        onPress={() => updateFormState({ [stateKey]: value })}
+      >
+        <Text style={[styles.pickerText, isSelected && styles.pickerTextSelected]}>
+          {label}
         </Text>
-        <TouchableOpacity
-          style={styles.permissionButton}
-          onPress={async () => {
-            const { status } = await MediaLibrary.requestPermissionsAsync();
-            setHasPermission(status === 'granted');
-          }}
-        >
-          <Text style={styles.permissionButtonText}>Grant Permission</Text>
-        </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     );
-  }
+  };
+
+  const renderImagePlaceholder = (slot, label, image, optional = false) => {
+    const isActive = activeImageSlot === slot;
+    const hasImage = !!image;
+
+    const handleDelete = () => {
+      const updates = {};
+      updates[`${slot}Image`] = null;
+      updateFormState(updates);
+    };
+
+    return (
+      <TouchableOpacity
+        key={slot}
+        style={[
+          styles.imagePlaceholder,
+          isActive && styles.imagePlaceholderActive,
+          hasImage && styles.imagePlaceholderFilled,
+        ]}
+        onPress={() => handleImageSlotTap(slot)}
+      >
+        {hasImage ? (
+          <>
+            <Image source={{ uri: image }} style={styles.placeholderImage} contentFit="cover" />
+            {/* Delete button */}
+            <TouchableOpacity
+              style={styles.deleteImageButton}
+              onPress={handleDelete}
+            >
+              <Ionicons name="close-circle" size={28} color="#FF6800" />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <View style={styles.placeholderEmpty}>
+            <Ionicons name="image-outline" size={40} color="#666" />
+          </View>
+        )}
+        <View style={styles.placeholderLabel}>
+          <Text style={styles.placeholderLabelText}>
+            {label}
+            {!optional && <Text style={styles.requiredAsterisk}> *</Text>}
+            {optional && <Text style={styles.optionalLabel}> (Optional)</Text>}
+          </Text>
+          {hasImage && (
+            <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderPhotoItem = ({ item }) => {
+    const isSelected = selectedPhoto?.id === item.id;
+    return (
+      <TouchableOpacity
+        style={[styles.photoItem, isSelected && styles.photoItemSelected]}
+        onPress={() => handlePhotoTap(item)}
+      >
+        <Image source={{ uri: item.uri }} style={styles.photoThumbnail} contentFit="cover" />
+        {isSelected && (
+          <View style={styles.photoSelectedOverlay}>
+            <Ionicons name="checkmark-circle" size={30} color="#FF6800" />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Top Half - Scrollable Form */}
-      <ScrollView
-        style={styles.topHalf}
-        contentContainerStyle={styles.formContainer}
-        keyboardShouldPersistTaps="handled"
-      >
+      {/* Auto-save indicator */}
+      <AutoSaveIndicator status={saveStatus} lastSaved={lastSaved} />
 
+      {/* Top Half - Form */}
+      <ScrollView style={styles.topHalf} contentContainerStyle={styles.formContainer}>
         {/* Title Input */}
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Title</Text>
+          <Text style={styles.inputLabel}>
+            Title<Text style={styles.requiredAsterisk}> *</Text>
+          </Text>
           <TextInput
             style={styles.textInput}
-            placeholder="e.g., Mirage A Site CT Smoke"
+            placeholder="e.g., CT Smoke from Spawn"
             placeholderTextColor="#666"
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(text) => updateFormState({ title: text })}
             maxLength={50}
           />
           <Text style={styles.charCount}>{title.length}/50</Text>
@@ -319,11 +488,11 @@ export default function PostScreen({ navigation, route }) {
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Description</Text>
           <TextInput
-            style={[styles.textInput, styles.textInputMultiline]}
-            placeholder="Describe your lineup..."
+            style={[styles.textInput, styles.textArea]}
+            placeholder="Add details about this lineup..."
             placeholderTextColor="#666"
             value={description}
-            onChangeText={setDescription}
+            onChangeText={(text) => updateFormState({ description: text })}
             maxLength={200}
             multiline
             numberOfLines={3}
@@ -333,31 +502,37 @@ export default function PostScreen({ navigation, route }) {
 
         {/* Side Picker */}
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Side</Text>
+          <Text style={styles.inputLabel}>
+            Side<Text style={styles.requiredAsterisk}> *</Text>
+          </Text>
           <View style={styles.pickerRow}>
-            {renderPickerOption('T', 'T Side', side, setSide)}
-            {renderPickerOption('CT', 'CT Side', side, setSide)}
+            {renderPickerOptionSimple('T', 'T Side', side, 'side')}
+            {renderPickerOptionSimple('CT', 'CT Side', side, 'side')}
           </View>
         </View>
 
         {/* Site Picker */}
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Site</Text>
+          <Text style={styles.inputLabel}>
+            Site<Text style={styles.requiredAsterisk}> *</Text>
+          </Text>
           <View style={styles.pickerRow}>
-            {renderPickerOption('A', 'A Site', site, setSite)}
-            {renderPickerOption('Mid', 'Mid', site, setSite)}
-            {renderPickerOption('B', 'B Site', site, setSite)}
+            {renderPickerOptionSimple('A', 'A Site', site, 'site')}
+            {renderPickerOptionSimple('Mid', 'Mid', site, 'site')}
+            {renderPickerOptionSimple('B', 'B Site', site, 'site')}
           </View>
         </View>
 
         {/* Nade Type Picker */}
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Grenade Type</Text>
+          <Text style={styles.inputLabel}>
+            Grenade Type<Text style={styles.requiredAsterisk}> *</Text>
+          </Text>
           <View style={styles.pickerRow}>
-            {renderPickerOption('Smoke', 'Smoke', nadeType, setNadeType)}
-            {renderPickerOption('Flash', 'Flash', nadeType, setNadeType)}
-            {renderPickerOption('Molotov', 'Molotov', nadeType, setNadeType)}
-            {renderPickerOption('HE', 'HE Grenade', nadeType, setNadeType)}
+            {renderPickerOptionSimple('Smoke', 'Smoke', nadeType, 'nadeType')}
+            {renderPickerOptionSimple('Flash', 'Flash', nadeType, 'nadeType')}
+            {renderPickerOptionSimple('Molotov', 'Molotov', nadeType, 'nadeType')}
+            {renderPickerOptionSimple('HE', 'HE Grenade', nadeType, 'nadeType')}
           </View>
         </View>
 
@@ -369,7 +544,7 @@ export default function PostScreen({ navigation, route }) {
             placeholder="e.g., Jump throw, aim at corner"
             placeholderTextColor="#666"
             value={throwInstructions}
-            onChangeText={setThrowInstructions}
+            onChangeText={(text) => updateFormState({ throwInstructions: text })}
             maxLength={100}
           />
           <Text style={styles.charCount}>{throwInstructions.length}/100</Text>
@@ -380,7 +555,7 @@ export default function PostScreen({ navigation, route }) {
         {renderImagePlaceholder('stand', '1. Where to Stand', standImage)}
         {renderImagePlaceholder('aim', '2. Where to Aim', aimImage)}
         {renderImagePlaceholder('land', '3. Where It Lands', landImage)}
-        {renderImagePlaceholder('thirdPerson', '4. Third Person View', thirdPersonImage, true)}
+        {renderImagePlaceholder('moreDetails', '4. More Details', moreDetailsImage, true)}
 
         {/* Preview Button */}
         <TouchableOpacity style={styles.previewButton} onPress={handlePreview}>
@@ -405,38 +580,23 @@ export default function PostScreen({ navigation, route }) {
         ) : photos.length === 0 ? (
           <View style={styles.emptyGallery}>
             <Ionicons name="images-outline" size={60} color="#666" />
-            <Text style={styles.emptyGalleryText}>No photos found</Text>
+            <Text style={styles.emptyText}>No photos found</Text>
           </View>
         ) : (
           <FlatList
             data={photos}
+            renderItem={renderPhotoItem}
             keyExtractor={(item) => item.id}
-            numColumns={4}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.photoThumbnail,
-                  selectedPhoto?.id === item.id && styles.photoThumbnailSelected,
-                ]}
-                onPress={() => handlePhotoTap(item)}
-                disabled={!activeImageSlot}
-              >
-                <Image source={{ uri: item.uri }} style={styles.thumbnailImage} />
-                {selectedPhoto?.id === item.id && (
-                  <View style={styles.selectedOverlay}>
-                    <Ionicons name="checkmark-circle" size={24} color="#FF6800" />
-                  </View>
-                )}
-              </TouchableOpacity>
-            )}
+            numColumns={3}
             contentContainerStyle={styles.galleryGrid}
           />
         )}
 
-        {/* Confirm/Cancel Buttons */}
+        {/* Confirm/Cancel buttons for selection */}
         {selectedPhoto && (
-          <View style={styles.confirmBar}>
+          <View style={styles.selectionActions}>
             <TouchableOpacity style={styles.cancelButton} onPress={cancelSelection}>
+              <Ionicons name="close" size={20} color="#fff" />
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.confirmButton} onPress={confirmImageSelection}>
@@ -446,6 +606,31 @@ export default function PostScreen({ navigation, route }) {
           </View>
         )}
       </View>
+
+      {/* Image Crop Modal */}
+      <ImageCropModal
+        visible={showCropModal}
+        imageUri={cropImageUri}
+        onConfirm={handleCroppedImage}
+        onCancel={handleCropCancel}
+      />
+
+      {/* Draft Selection Modal */}
+      <DraftSelectionModal
+        visible={showDraftModal}
+        onSelectDraft={(draft) => {
+          loadDraft(draft.id); // This sets currentDraftId
+          navigation.setParams({ loadDraft: draft });
+          setShowDraftModal(false);
+        }}
+        onCreateNew={() => {
+          // Clear form and create new draft
+          resetForm();
+          createNewDraft(); // This creates and sets new currentDraftId
+          setShowDraftModal(false);
+        }}
+        onClose={() => setShowDraftModal(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -455,18 +640,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0a0a0a',
   },
+  headerLeft: {
+    flexDirection: 'row',
+    marginLeft: 10,
+    gap: 8,
+  },
+  undoRedoButton: {
+    padding: 6,
+  },
+  undoRedoButtonDisabled: {
+    opacity: 0.3,
+  },
   topHalf: {
     flex: 1,
   },
   formContainer: {
     padding: 20,
     paddingBottom: 40,
-  },
-  sectionTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 20,
   },
   inputGroup: {
     marginBottom: 20,
@@ -477,16 +667,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 8,
   },
+  requiredAsterisk: {
+    color: '#FF6800',
+    fontSize: 16,
+  },
+  optionalLabel: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: 'normal',
+  },
   textInput: {
     backgroundColor: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: 10,
-    padding: 15,
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
     color: '#fff',
+    borderWidth: 1,
+    borderColor: '#333',
   },
-  textInputMultiline: {
+  textArea: {
     height: 80,
     textAlignVertical: 'top',
   },
@@ -494,119 +693,111 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     textAlign: 'right',
-    marginTop: 5,
+    marginTop: 4,
   },
   pickerRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   pickerOption: {
+    flex: 1,
     backgroundColor: '#1a1a1a',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#333',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
   },
-  pickerOptionActive: {
+  pickerOptionSelected: {
     backgroundColor: '#FF6800',
     borderColor: '#FF6800',
   },
-  pickerOptionText: {
-    fontSize: 15,
-    color: '#fff',
-  },
-  pickerOptionTextActive: {
+  pickerText: {
+    fontSize: 14,
+    color: '#999',
     fontWeight: '600',
   },
+  pickerTextSelected: {
+    color: '#fff',
+  },
   imagesTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
     marginTop: 10,
     marginBottom: 15,
   },
-  imageSection: {
-    marginBottom: 20,
-  },
-  imageLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  imageLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  optionalLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-    fontStyle: 'italic',
-  },
   imagePlaceholder: {
-    height: 200,
+    width: '100%',
+    aspectRatio: 16 / 9,
     backgroundColor: '#1a1a1a',
-    borderWidth: 2,
-    borderColor: '#333',
     borderRadius: 12,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginBottom: 15,
     overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: '#333',
   },
   imagePlaceholderActive: {
     borderColor: '#FF6800',
-    borderStyle: 'solid',
-    backgroundColor: '#1a1a1a',
+    borderWidth: 3,
   },
   imagePlaceholderFilled: {
-    borderStyle: 'solid',
     borderColor: '#FF6800',
-  },
-  placeholderContent: {
-    alignItems: 'center',
+    borderWidth: 3,
   },
   placeholderImage: {
     width: '100%',
     height: '100%',
   },
-  placeholderText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 10,
-  },
-  placeholderTextActive: {
-    color: '#FF6800',
-  },
-  changeImageIndicator: {
+  deleteImageButton: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 20,
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 14,
+    width: 28,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderEmpty: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderLabel: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     padding: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  placeholderLabelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
   },
   previewButton: {
     backgroundColor: '#FF6800',
     borderRadius: 12,
-    padding: 18,
+    padding: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
-    gap: 10,
+    marginTop: 10,
+    gap: 8,
   },
   previewButtonText: {
-    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#fff',
   },
   bottomHalf: {
-    height: 280,
-    backgroundColor: '#1a1a1a',
+    height: 300,
     borderTopWidth: 1,
     borderTopColor: '#333',
   },
@@ -614,9 +805,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-    gap: 10,
+    backgroundColor: '#1a1a1a',
+    gap: 8,
   },
   galleryTitle: {
     fontSize: 16,
@@ -627,7 +817,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 15,
+    gap: 10,
   },
   loadingText: {
     fontSize: 14,
@@ -637,93 +827,76 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 15,
+    gap: 10,
   },
-  emptyGalleryText: {
+  emptyText: {
     fontSize: 16,
     color: '#666',
   },
   galleryGrid: {
-    padding: 5,
+    padding: 2,
+  },
+  photoItem: {
+    flex: 1 / 3,
+    aspectRatio: 1,
+    padding: 2,
+  },
+  photoItemSelected: {
+    opacity: 0.7,
   },
   photoThumbnail: {
-    width: '24%',
-    aspectRatio: 1,
-    margin: '0.5%',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  photoThumbnailSelected: {
-    borderWidth: 3,
-    borderColor: '#FF6800',
-  },
-  thumbnailImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 4,
   },
-  selectedOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 104, 0, 0.3)',
+  photoSelectedOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
+    margin: 2,
+    borderRadius: 4,
   },
-  confirmBar: {
+  selectionActions: {
     flexDirection: 'row',
     padding: 15,
     gap: 10,
+    backgroundColor: '#1a1a1a',
     borderTopWidth: 1,
     borderTopColor: '#333',
   },
   cancelButton: {
     flex: 1,
     backgroundColor: '#2a2a2a',
-    borderRadius: 10,
-    padding: 15,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  confirmButton: {
-    flex: 2,
-    backgroundColor: '#FF6800',
-    borderRadius: 10,
-    padding: 15,
+    borderRadius: 8,
+    padding: 12,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
-  confirmButtonText: {
-    color: '#fff',
+  cancelButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    color: '#fff',
   },
-  permissionContainer: {
+  confirmButton: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#FF6800',
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    gap: 6,
   },
-  permissionText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginVertical: 20,
-    lineHeight: 24,
-  },
-  permissionButton: {
-    backgroundColor: '#FF6800',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 10,
-  },
-  permissionButtonText: {
-    color: '#fff',
+  confirmButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#fff',
   },
 });
