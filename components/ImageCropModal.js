@@ -18,26 +18,21 @@ import * as ImageManipulator from 'expo-image-manipulator';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
-const CROP_ASPECT_RATIO = 16 / 9;
 
-// Calculate crop frame dimensions (16:9)
 const CROP_FRAME_WIDTH = SCREEN_WIDTH - 40;
-const CROP_FRAME_HEIGHT = CROP_FRAME_WIDTH / CROP_ASPECT_RATIO;
+const CROP_FRAME_HEIGHT = CROP_FRAME_WIDTH / (16 / 9);
 
 export default function ImageCropModal({ visible, imageUri, onConfirm, onCancel }) {
   const [processing, setProcessing] = useState(false);
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
-  
-  // Use simple state instead of Animated values
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
-  const [zoomScale, setZoomScale] = useState(1);
-  
-  // Track gesture state
-  const gestureState = useRef({ x: 0, y: 0 });
-  const initialScale = useRef(1);
+  const [minScale, setMinScale] = useState(1);
 
-  // Get image dimensions
+  // Use Animated values
+  const translateX = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+
+  // Load image
   useEffect(() => {
     if (visible && imageUri) {
       const RNImage = require('react-native').Image;
@@ -45,162 +40,150 @@ export default function ImageCropModal({ visible, imageUri, onConfirm, onCancel 
       RNImage.getSize(
         imageUri,
         (width, height) => {
+          console.log('Image loaded:', width, 'x', height);
           setImageSize({ width, height });
           
-          // Calculate scale to fit image in crop frame
+          // Calculate minimum scale to cover the crop frame
           const scaleX = CROP_FRAME_WIDTH / width;
           const scaleY = CROP_FRAME_HEIGHT / height;
-          const fitScale = Math.max(scaleX, scaleY);
+          const initialScale = Math.max(scaleX, scaleY);
           
-          initialScale.current = fitScale;
-          setZoomScale(fitScale);
-          setPanX(0);
-          setPanY(0);
-          gestureState.current = { x: 0, y: 0 };
+          console.log('Initial scale:', initialScale);
+          
+          setMinScale(initialScale);
+          scale.setValue(initialScale);
+          
+          // Center
+          translateX.setValue(0);
+          translateY.setValue(0);
         },
         (error) => {
-          console.error('Failed to get image size:', error);
-          setImageSize({ width: 1920, height: 1080 });
+          console.error('Failed to load image:', error);
+          Alert.alert('Error', 'Failed to load image');
         }
       );
     }
   }, [visible, imageUri]);
 
-  // Calculate bounds for panning
-  const getBounds = (scale) => {
-    const scaledWidth = imageSize.width * scale;
-    const scaledHeight = imageSize.height * scale;
-    
-    const maxX = Math.max(0, (scaledWidth - CROP_FRAME_WIDTH) / 2);
-    const maxY = Math.max(0, (scaledHeight - CROP_FRAME_HEIGHT) / 2);
-    
-    return { maxX, maxY };
-  };
-
-  // Pan responder
+  // Pan responder - SIMPLE, no boundaries
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      
       onPanResponderGrant: () => {
-        // Store starting position
-        gestureState.current = { x: panX, y: panY };
+        // @ts-ignore
+        translateX.setOffset(translateX._value);
+        // @ts-ignore
+        translateY.setOffset(translateY._value);
+        translateX.setValue(0);
+        translateY.setValue(0);
       },
-      onPanResponderMove: (_, gesture) => {
-        // Update position directly (no animation)
-        const newX = gestureState.current.x + gesture.dx;
-        const newY = gestureState.current.y + gesture.dy;
-        
-        // Apply bounds
-        const bounds = getBounds(zoomScale);
-        const clampedX = Math.max(-bounds.maxX, Math.min(bounds.maxX, newX));
-        const clampedY = Math.max(-bounds.maxY, Math.min(bounds.maxY, newY));
-        
-        setPanX(clampedX);
-        setPanY(clampedY);
-      },
+      
+      onPanResponderMove: Animated.event(
+        [null, { dx: translateX, dy: translateY }],
+        { useNativeDriver: false }
+      ),
+      
       onPanResponderRelease: () => {
-        // Position is already set, nothing more to do
+        translateX.flattenOffset();
+        translateY.flattenOffset();
       },
     })
   ).current;
 
   const handleZoomIn = () => {
-    const newScale = Math.min(zoomScale * 1.3, 5);
-    setZoomScale(newScale);
+    // @ts-ignore
+    const currentScale = scale._value;
+    const newScale = Math.min(currentScale * 1.3, 5);
     
-    // Adjust pan to stay in bounds
-    const bounds = getBounds(newScale);
-    setPanX(Math.max(-bounds.maxX, Math.min(bounds.maxX, panX)));
-    setPanY(Math.max(-bounds.maxY, Math.min(bounds.maxY, panY)));
+    Animated.spring(scale, {
+      toValue: newScale,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
   };
 
   const handleZoomOut = () => {
-    const newScale = Math.max(zoomScale * 0.7, initialScale.current);
-    setZoomScale(newScale);
+    // @ts-ignore
+    const currentScale = scale._value;
+    const newScale = Math.max(currentScale * 0.7, minScale);
     
-    // Adjust pan to stay in bounds
-    const bounds = getBounds(newScale);
-    setPanX(Math.max(-bounds.maxX, Math.min(bounds.maxX, panX)));
-    setPanY(Math.max(-bounds.maxY, Math.min(bounds.maxY, panY)));
+    Animated.spring(scale, {
+      toValue: newScale,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
   };
 
   const handleReset = () => {
-    setZoomScale(initialScale.current);
-    setPanX(0);
-    setPanY(0);
-    gestureState.current = { x: 0, y: 0 };
+    scale.setValue(minScale);
+    translateX.setValue(0);
+    translateY.setValue(0);
   };
 
   const handleCrop = async () => {
     if (!imageUri || !imageSize.width) return;
-
     setProcessing(true);
 
     try {
-      // Screen positions
-      const screenCenterX = SCREEN_WIDTH / 2;
-      const screenCenterY = SCREEN_HEIGHT / 2;
+      // Get current values
+      // @ts-ignore
+      const currentX = translateX._value;
+      // @ts-ignore
+      const currentY = translateY._value;
+      // @ts-ignore
+      const currentScale = scale._value;
       
-      // Image center on screen (including pan)
-      const imageCenterX = screenCenterX + panX;
-      const imageCenterY = screenCenterY + panY;
+      console.log('Crop with:', currentX, currentY, currentScale);
       
-      // Crop frame position
-      const frameLeft = screenCenterX - (CROP_FRAME_WIDTH / 2);
-      const frameTop = screenCenterY - (CROP_FRAME_HEIGHT / 2);
+      // Calculate the crop area
+      const scaledImageWidth = imageSize.width * currentScale;
+      const scaledImageHeight = imageSize.height * currentScale;
       
-      // Offset from image center to frame top-left
-      const offsetX = frameLeft - imageCenterX;
-      const offsetY = frameTop - imageCenterY;
+      // Position of image center on screen
+      const imageCenterX = SCREEN_WIDTH / 2 + currentX;
+      const imageCenterY = SCREEN_HEIGHT / 2 + currentY;
       
-      // Convert to image coordinates
-      const imageHalfWidth = (imageSize.width * zoomScale) / 2;
-      const imageHalfHeight = (imageSize.height * zoomScale) / 2;
+      // Position of crop frame center
+      const frameCenterX = SCREEN_WIDTH / 2;
+      const frameCenterY = SCREEN_HEIGHT / 2;
       
-      // Calculate crop origin in scaled image space
-      const scaledOriginX = imageHalfWidth + offsetX;
-      const scaledOriginY = imageHalfHeight + offsetY;
+      // Offset from image center to frame center
+      const offsetX = frameCenterX - imageCenterX;
+      const offsetY = frameCenterY - imageCenterY;
       
-      // Convert to original image coordinates (remove scale)
-      const originX = scaledOriginX / zoomScale;
-      const originY = scaledOriginY / zoomScale;
-      const cropWidth = CROP_FRAME_WIDTH / zoomScale;
-      const cropHeight = CROP_FRAME_HEIGHT / zoomScale;
+      // Position of frame top-left relative to image top-left (in scaled coordinates)
+      const frameLeftInImage = (scaledImageWidth / 2) + offsetX - (CROP_FRAME_WIDTH / 2);
+      const frameTopInImage = (scaledImageHeight / 2) + offsetY - (CROP_FRAME_HEIGHT / 2);
       
-      // Ensure crop is within bounds
-      const finalOriginX = Math.max(0, Math.min(imageSize.width - cropWidth, Math.floor(originX)));
-      const finalOriginY = Math.max(0, Math.min(imageSize.height - cropHeight, Math.floor(originY)));
-      const finalWidth = Math.min(imageSize.width - finalOriginX, Math.floor(cropWidth));
-      const finalHeight = Math.min(imageSize.height - finalOriginY, Math.floor(cropHeight));
+      // Convert to original image coordinates
+      const cropX = frameLeftInImage / currentScale;
+      const cropY = frameTopInImage / currentScale;
+      const cropWidth = CROP_FRAME_WIDTH / currentScale;
+      const cropHeight = CROP_FRAME_HEIGHT / currentScale;
+      
+      // Ensure crop is within image bounds
+      const finalX = Math.max(0, Math.min(imageSize.width - cropWidth, Math.floor(cropX)));
+      const finalY = Math.max(0, Math.min(imageSize.height - cropHeight, Math.floor(cropY)));
+      const finalWidth = Math.min(imageSize.width - finalX, Math.floor(cropWidth));
+      const finalHeight = Math.min(imageSize.height - finalY, Math.floor(cropHeight));
 
-      console.log('Crop calculation:', {
-        pan: { x: panX, y: panY },
-        scale: zoomScale,
-        crop: {
-          originX: finalOriginX,
-          originY: finalOriginY,
-          width: finalWidth,
-          height: finalHeight,
-        },
-        imageSize,
+      console.log('Crop params:', {
+        originX: finalX,
+        originY: finalY,
+        width: finalWidth,
+        height: finalHeight,
       });
 
-      // Validate
-      if (finalOriginX < 0 || finalOriginY < 0 || 
-          finalOriginX + finalWidth > imageSize.width ||
-          finalOriginY + finalHeight > imageSize.height) {
-        throw new Error('Crop rectangle is outside image bounds');
-      }
-
-      // Perform crop
+      // Perform the crop
       const result = await ImageManipulator.manipulateAsync(
         imageUri,
         [
           {
             crop: {
-              originX: finalOriginX,
-              originY: finalOriginY,
+              originX: finalX,
+              originY: finalY,
               width: finalWidth,
               height: finalHeight,
             },
@@ -221,19 +204,14 @@ export default function ImageCropModal({ visible, imageUri, onConfirm, onCancel 
       setProcessing(false);
       onConfirm(result.uri);
     } catch (error) {
-      console.error('Image crop error:', error);
+      console.error('Crop error:', error);
       setProcessing(false);
-      Alert.alert('Crop Failed', error.message || 'Please try again.');
+      Alert.alert('Crop Failed', error.message || 'Please try again');
     }
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={false}
-      onRequestClose={onCancel}
-    >
+    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onCancel}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
@@ -246,74 +224,59 @@ export default function ImageCropModal({ visible, imageUri, onConfirm, onCancel 
           </TouchableOpacity>
         </View>
 
-        {/* Crop Area */}
-        <View style={styles.cropArea}>
-          <View
-            style={[
-              styles.imageContainer,
-              {
-                transform: [
-                  { translateX: panX },
-                  { translateY: panY },
-                  { scale: zoomScale },
-                ],
-              },
-            ]}
-            {...panResponder.panHandlers}
-          >
-            <Image
-              source={{ uri: imageUri }}
+        {/* Crop area */}
+        <View style={styles.cropContainer}>
+          <View style={styles.imageArea} {...panResponder.panHandlers}>
+            <Animated.View
               style={{
-                width: imageSize.width,
-                height: imageSize.height,
+                transform: [
+                  { translateX: translateX },
+                  { translateY: translateY },
+                  { scale: scale },
+                ],
               }}
-              contentFit="contain"
-            />
+            >
+              <Image
+                source={{ uri: imageUri }}
+                style={{
+                  width: imageSize.width,
+                  height: imageSize.height,
+                }}
+                contentFit="contain"
+              />
+            </Animated.View>
           </View>
 
-          {/* Dark overlay with transparent crop frame */}
+          {/* Overlay */}
           <View style={styles.overlay} pointerEvents="none">
-            {/* Top overlay */}
-            <View style={styles.overlaySection} />
-            
-            {/* Middle row */}
+            <View style={styles.overlayTop} />
             <View style={styles.overlayMiddle}>
-              <View style={styles.overlaySection} />
-              
-              {/* Crop frame (transparent) */}
-              <View style={styles.cropFrame}>
-                {/* Frame border */}
-                <View style={styles.frameBorder} />
-                
-                {/* Corners */}
-                <View style={[styles.corner, styles.topLeft]} />
-                <View style={[styles.corner, styles.topRight]} />
-                <View style={[styles.corner, styles.bottomLeft]} />
-                <View style={[styles.corner, styles.bottomRight]} />
-                
-                {/* Grid lines */}
-                <View style={[styles.gridLine, { left: '33.33%' }]} />
-                <View style={[styles.gridLine, { left: '66.66%' }]} />
-                <View style={[styles.gridLineH, { top: '33.33%' }]} />
-                <View style={[styles.gridLineH, { top: '66.66%' }]} />
-              </View>
-              
-              <View style={styles.overlaySection} />
+              <View style={styles.overlaySide} />
+              <View style={styles.cropFrameArea} />
+              <View style={styles.overlaySide} />
             </View>
-            
-            {/* Bottom overlay */}
-            <View style={styles.overlaySection} />
+            <View style={styles.overlayBottom} />
+          </View>
+
+          {/* Crop frame */}
+          <View style={styles.cropFrame} pointerEvents="none">
+            <View style={styles.frameBorder} />
+            <View style={[styles.corner, styles.cornerTL]} />
+            <View style={[styles.corner, styles.cornerTR]} />
+            <View style={[styles.corner, styles.cornerBL]} />
+            <View style={[styles.corner, styles.cornerBR]} />
+            <View style={[styles.gridLine, styles.gridV1]} />
+            <View style={[styles.gridLine, styles.gridV2]} />
+            <View style={[styles.gridLine, styles.gridH1]} />
+            <View style={[styles.gridLine, styles.gridH2]} />
           </View>
         </View>
 
-        {/* Instructions */}
-        <Text style={styles.instructions}>
-          Drag to position • Tap buttons to zoom
-        </Text>
+        <Text style={styles.instructions}>Drag to reposition • Pinch or use buttons to zoom</Text>
 
-        {/* Zoom Controls */}
+        {/* Zoom controls */}
         <View style={styles.controls}>
-          <TouchableOpacity style={styles.zoomBtn} onPress={handleZoomOut} disabled={processing}>
+          <TouchableOpacity style={styles.zoomButton} onPress={handleZoomOut} disabled={processing}>
             <Ionicons name="remove" size={24} color="#fff" />
           </TouchableOpacity>
           
@@ -321,14 +284,14 @@ export default function ImageCropModal({ visible, imageUri, onConfirm, onCancel 
             <Ionicons name="scan-outline" size={20} color="#999" />
           </View>
           
-          <TouchableOpacity style={styles.zoomBtn} onPress={handleZoomIn} disabled={processing}>
+          <TouchableOpacity style={styles.zoomButton} onPress={handleZoomIn} disabled={processing}>
             <Ionicons name="add" size={24} color="#fff" />
           </TouchableOpacity>
         </View>
 
-        {/* Confirm Button */}
+        {/* Confirm button */}
         <TouchableOpacity
-          style={[styles.confirmBtn, processing && styles.confirmBtnDisabled]}
+          style={[styles.confirmButton, processing && styles.confirmButtonDisabled]}
           onPress={handleCrop}
           disabled={processing}
         >
@@ -357,22 +320,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 60,
-    paddingBottom: 15,
-    backgroundColor: '#0a0a0a',
+    paddingBottom: 20,
   },
   title: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#fff',
   },
-  cropArea: {
+  cropContainer: {
     flex: 1,
     position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
   },
-  imageContainer: {
+  imageArea: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -385,19 +345,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  overlaySection: {
+  overlayTop: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  overlayBottom: {
     flex: 1,
     width: '100%',
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   overlayMiddle: {
     flexDirection: 'row',
+    width: '100%',
     height: CROP_FRAME_HEIGHT,
   },
+  overlaySide: {
+    width: 20,
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  cropFrameArea: {
+    flex: 1,
+    height: '100%',
+  },
   cropFrame: {
+    position: 'absolute',
+    top: '50%',
+    left: 20,
     width: CROP_FRAME_WIDTH,
     height: CROP_FRAME_HEIGHT,
-    position: 'relative',
+    marginTop: -CROP_FRAME_HEIGHT / 2,
   },
   frameBorder: {
     position: 'absolute',
@@ -414,25 +392,25 @@ const styles = StyleSheet.create({
     height: 20,
     borderColor: '#fff',
   },
-  topLeft: {
+  cornerTL: {
     top: -2,
     left: -2,
     borderTopWidth: 3,
     borderLeftWidth: 3,
   },
-  topRight: {
+  cornerTR: {
     top: -2,
     right: -2,
     borderTopWidth: 3,
     borderRightWidth: 3,
   },
-  bottomLeft: {
+  cornerBL: {
     bottom: -2,
     left: -2,
     borderBottomWidth: 3,
     borderLeftWidth: 3,
   },
-  bottomRight: {
+  cornerBR: {
     bottom: -2,
     right: -2,
     borderBottomWidth: 3,
@@ -440,23 +418,38 @@ const styles = StyleSheet.create({
   },
   gridLine: {
     position: 'absolute',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  gridV1: {
+    left: '33.33%',
     top: 0,
     bottom: 0,
     width: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
-  gridLineH: {
-    position: 'absolute',
+  gridV2: {
+    left: '66.66%',
+    top: 0,
+    bottom: 0,
+    width: 1,
+  },
+  gridH1: {
+    top: '33.33%',
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  gridH2: {
+    top: '66.66%',
+    left: 0,
+    right: 0,
+    height: 1,
   },
   instructions: {
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
-    marginVertical: 15,
+    marginVertical: 16,
+    paddingHorizontal: 20,
   },
   controls: {
     flexDirection: 'row',
@@ -466,11 +459,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     gap: 20,
   },
-  zoomBtn: {
+  zoomButton: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: '#333',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -478,7 +471,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  confirmBtn: {
+  confirmButton: {
     backgroundColor: '#FF6800',
     marginHorizontal: 20,
     marginBottom: 40,
@@ -489,12 +482,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  confirmBtnDisabled: {
+  confirmButtonDisabled: {
     opacity: 0.6,
   },
   confirmText: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#fff',
   },
 });
