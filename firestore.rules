@@ -31,6 +31,15 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && request.auth.uid == resource.data.creatorId;
     }
 
+    // Tactics collection
+    match /tactics/{tacticId} {
+      allow read: if true;
+      // Authenticated users can create tactics
+      allow create: if isSignedIn();
+      // Only the creator can update/delete their tactics
+      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.creatorId;
+    }
+
     // Rooms collection for tactics
     match /rooms/{roomId} {
       allow read, write: if isSignedIn();

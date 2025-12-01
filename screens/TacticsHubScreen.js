@@ -1,11 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MAPS } from '../data/maps';
-import { TACTICS } from '../data/tactics';
 import { getFilteredLineups } from '../services/lineupService';
+import { fetchPublicTactics, fetchUserTactics, createTactic } from '../services/tacticService';
 import { useFavorites } from '../context/FavoritesContext';
 import { useTacticLibrary } from '../context/TacticLibraryContext';
+import { useAuth } from '../context/AuthContext';
 import TacticCard from '../components/TacticCard';
 
 export default function TacticsHubScreen({ navigation, route }) {
@@ -19,9 +20,14 @@ export default function TacticsHubScreen({ navigation, route }) {
   const [selectedSide, setSelectedSide] = useState('T');
   const [mapLineups, setMapLineups] = useState([]);
   const [loadingLineups, setLoadingLineups] = useState(false);
+  const [loadingTactics, setLoadingTactics] = useState(false);
+  const [creatingTactic, setCreatingTactic] = useState(false);
+  const [publicTactics, setPublicTactics] = useState([]);
+  const [myTacticsRemote, setMyTacticsRemote] = useState([]);
   const [actionMessage, setActionMessage] = useState('');
   const { getFavorites } = useFavorites();
   const { savedTactics, toggleTactic, isSaved, saveTactic } = useTacticLibrary();
+  const { currentUser } = useAuth();
 
   useEffect(() => {
     const nextMapId =
@@ -63,6 +69,34 @@ export default function TacticsHubScreen({ navigation, route }) {
     };
   }, [selectedMapId, selectedSide]);
 
+  const loadTactics = useCallback(async () => {
+    if (!selectedMapId) {
+      setPublicTactics([]);
+      setMyTacticsRemote([]);
+      return;
+    }
+
+    try {
+      setLoadingTactics(true);
+      const [publicList, personalList] = await Promise.all([
+        fetchPublicTactics(selectedMapId, selectedSide),
+        currentUser?.uid
+          ? fetchUserTactics(currentUser.uid, selectedMapId, selectedSide)
+          : Promise.resolve([]),
+      ]);
+      setPublicTactics(publicList || []);
+      setMyTacticsRemote(personalList || []);
+    } catch (error) {
+      console.error('Failed to load tactics', error);
+    } finally {
+      setLoadingTactics(false);
+    }
+  }, [currentUser?.uid, selectedMapId, selectedSide]);
+
+  useEffect(() => {
+    loadTactics();
+  }, [loadTactics]);
+
   useEffect(() => {
     if (!actionMessage) return undefined;
     const timeout = setTimeout(() => setActionMessage(''), 2400);
@@ -78,93 +112,61 @@ export default function TacticsHubScreen({ navigation, route }) {
     }, {});
   }, [mapLineups]);
 
-  const textbookLineups = useMemo(
-    () => mapLineups.filter((lineup) => lineup.isTextbook),
-    [mapLineups],
-  );
-
-  const tacticTemplates = useMemo(() => {
-    if (!selectedMapId) return [];
-    const base = TACTICS.filter(
-      (tactic) =>
-        tactic.mapId === selectedMapId &&
-        (!tactic.side || tactic.side.toUpperCase() === selectedSide.toUpperCase()),
-    );
-
-    const merged = [];
-    const seen = new Set();
-
-    if (textbookLineups.length) {
-      const id = `${selectedMapId}_${selectedSide}_textbook_pack`;
-      merged.push({
-        id,
-        mapId: selectedMapId,
-        side: selectedSide.toUpperCase(),
-        category: 'default',
-        title: `${selectedMap?.name || selectedMapId} ${selectedSide.toUpperCase()} textbook`,
-        description: 'Core textbook utility on this side, bundled for quick recall.',
-        lineupIds: textbookLineups.map((item) => item.id),
-        tags: ['textbook', 'default'],
-      });
-      seen.add(id);
-    }
-
-    base.forEach((tactic) => {
-      if (seen.has(tactic.id)) return;
-      merged.push({
-        ...tactic,
-        side: (tactic.side || selectedSide).toUpperCase(),
-        tags: tactic.tags || (tactic.category ? [tactic.category] : []),
-      });
-      seen.add(tactic.id);
-    });
-
-    return merged;
-  }, [selectedMapId, selectedSide, textbookLineups, selectedMap?.name]);
-
-  const tacticsForMap = useMemo(() => {
-    if (!selectedMapId) return [];
-    return tacticTemplates.map((tactic) => {
+  const hydrateTactic = useCallback(
+    (tactic) => {
       const resolvedLineups = (tactic.lineupIds || [])
         .map((id) => lineupsById[id] || lineupsById[String(id)] || lineupsById[Number(id)])
         .filter(Boolean);
-      const fallbackLineups = resolvedLineups.length
-        ? resolvedLineups
-        : (tactic.tags || []).includes('textbook')
-          ? textbookLineups
-          : mapLineups;
+      const fallbackLineups =
+        resolvedLineups.length > 0
+          ? resolvedLineups
+          : mapLineups.filter(
+              (lineup) => (lineup.side || '').toUpperCase() === (tactic.side || selectedSide).toUpperCase(),
+            );
+
+      const tags = new Set(tactic.tags || []);
+      if (tactic.isTextbook) tags.add('textbook');
+      if (tactic.creatorId && tactic.creatorId === currentUser?.uid) tags.add('mine');
 
       return {
         ...tactic,
+        side: (tactic.side || selectedSide).toUpperCase(),
+        tags: Array.from(tags),
         lineups: fallbackLineups,
         lineupCount: resolvedLineups.length || tactic.lineupIds?.length || fallbackLineups.length,
       };
-    });
-  }, [tacticTemplates, lineupsById, mapLineups, textbookLineups]);
+    },
+    [currentUser?.uid, lineupsById, mapLineups, selectedSide],
+  );
+
+  const exploreTactics = useMemo(
+    () => (selectedMapId ? publicTactics.map(hydrateTactic) : []),
+    [hydrateTactic, publicTactics, selectedMapId],
+  );
 
   const myTacticsForSelection = useMemo(() => {
     if (!selectedMapId) return [];
     const targetSide = selectedSide.toUpperCase();
-    return (savedTactics || [])
-      .filter(
-        (tactic) =>
-          tactic.mapId === selectedMapId &&
-          (tactic.side || '').toUpperCase() === targetSide,
-      )
-      .map((tactic) => {
-        const resolvedLineups = (tactic.lineupIds || [])
-          .map((id) => lineupsById[id] || lineupsById[String(id)] || lineupsById[Number(id)])
-          .filter(Boolean);
-        const fallbackLineups = resolvedLineups.length ? resolvedLineups : mapLineups;
+    const savedOnMap = (savedTactics || []).filter(
+      (tactic) =>
+        tactic.mapId === selectedMapId &&
+        (tactic.side || '').toUpperCase() === targetSide,
+    );
 
-        return {
-          ...tactic,
-          lineups: fallbackLineups,
-          lineupCount: resolvedLineups.length || tactic.lineupIds?.length || fallbackLineups.length,
-          tags: tactic.tags || [],
-        };
-      });
-  }, [savedTactics, selectedMapId, selectedSide, lineupsById, mapLineups]);
+    const createdOnMap = (myTacticsRemote || []).filter(
+      (tactic) =>
+        tactic.mapId === selectedMapId &&
+        (tactic.side || '').toUpperCase() === targetSide,
+    );
+
+    const merged = new Map();
+    [...createdOnMap, ...savedOnMap].forEach((tactic) => {
+      const hydrated = hydrateTactic(tactic);
+      merged.set(hydrated.id, hydrated);
+    });
+
+    return Array.from(merged.values());
+  }, [hydrateTactic, myTacticsRemote, savedTactics, selectedMapId, selectedSide]);
 
   const handleLineupPress = (lineup) => {
     navigation.navigate('LineupDetail', { lineupId: lineup.id });
@@ -182,9 +184,13 @@ export default function TacticsHubScreen({ navigation, route }) {
     setActionMessage(wasSaved ? 'Removed from My Tactics' : 'Saved to My Tactics');
   };
 
-  const handleCreateFromFavorites = () => {
+  const handleCreateFromFavorites = async () => {
     if (!selectedMapId) {
       setActionMessage('Pick a map first.');
+      return;
+    }
+    if (!currentUser?.uid) {
+      setActionMessage('Sign in to create tactics.');
       return;
     }
     const favoriteIds = getFavorites();
@@ -194,20 +200,40 @@ export default function TacticsHubScreen({ navigation, route }) {
       return;
     }
 
-    const tacticId = `custom_${selectedMapId}_${selectedSide}_${Date.now()}`;
-    const customTactic = {
-      id: tacticId,
-      mapId: selectedMapId,
-      side: selectedSide.toUpperCase(),
-      title: `${selectedMap?.name || selectedMapId} favorites`,
-      description: 'Built from your own posted or favorited lineups.',
-      lineupIds: favoritesOnMap.map((item) => item.id),
-      tags: ['custom', 'favorites'],
-    };
-
-    saveTactic(customTactic);
-    setActiveTab('my');
-    setActionMessage('Saved your favorites as a tactic');
+    try {
+      setCreatingTactic(true);
+      const created = await createTactic({
+        mapId: selectedMapId,
+        side: selectedSide,
+        title: `${selectedMap?.name || selectedMapId} favorites`,
+        description: 'Built from your own posted or favorited lineups.',
+        lineupIds: favoritesOnMap.map((item) => item.id),
+        tags: ['custom', 'favorites'],
+        creatorId: currentUser.uid,
+        creatorUsername:
+          currentUser.profile?.username ||
+          currentUser.displayName ||
+          currentUser.email ||
+          'Player',
+        creatorPlayerId: currentUser.profile?.playerID || null,
+        isTextbook: false,
+        isPublic: true,
+      });
+      // Keep local "saved" copy for offline recall
+      saveTactic({
+        ...created,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      await loadTactics();
+      setActiveTab('my');
+      setActionMessage('Created tactic from favorites');
+    } catch (error) {
+      console.error('Failed to create tactic from favorites', error);
+      setActionMessage('Could not create tactic. Try again.');
+    } finally {
+      setCreatingTactic(false);
+    }
   };
 
   const renderTacticCard = ({ item }) => (
@@ -229,14 +255,14 @@ export default function TacticsHubScreen({ navigation, route }) {
 
   const renderExplore = () => (
     <View style={{ flex: 1 }}>
-      {loadingLineups ? (
+      {loadingLineups || loadingTactics ? (
         <View style={styles.loadingState}>
           <ActivityIndicator color="#FF6800" />
           <Text style={styles.loadingText}>Loading tactics...</Text>
         </View>
       ) : (
         <FlatList
-          data={tacticsForMap}
+          data={exploreTactics}
           renderItem={renderTacticCard}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
@@ -260,9 +286,12 @@ export default function TacticsHubScreen({ navigation, route }) {
         style={styles.actionButton}
         onPress={handleCreateFromFavorites}
         activeOpacity={0.9}
+        disabled={creatingTactic}
       >
         <Ionicons name="add-circle-outline" size={20} color="#1a1a1a" />
-        <Text style={styles.actionButtonText}>Create tactic from favorites</Text>
+        <Text style={styles.actionButtonText}>
+          {creatingTactic ? 'Creating tactic...' : 'Create tactic from favorites'}
+        </Text>
       </TouchableOpacity>
 
       <FlatList

@@ -14,8 +14,8 @@ import ImageView from 'react-native-image-viewing';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
-import { TACTICS } from '../data/tactics';
 import { useTactics } from '../context/TacticsContext';
+import { fetchPublicTactics, fetchUserTactics } from '../services/tacticService';
 
 const PHASES = {
   MAP_SELECT: 'MAP_SELECT',
@@ -59,6 +59,8 @@ export default function RoomScreen() {
   const [optimisticVote, setOptimisticVote] = useState(null);
   const [mapLineups, setMapLineups] = useState([]);
   const [lineupsLoading, setLineupsLoading] = useState(false);
+  const [mapTactics, setMapTactics] = useState([]);
+  const [tacticsLoading, setTacticsLoading] = useState(false);
 
   const normalizedPhase = useMemo(() => {
     if (!room?.phase) return PHASES.MAP_SELECT;
@@ -101,6 +103,35 @@ export default function RoomScreen() {
     fetchMapLineups();
   }, [room?.mapId]);
 
+  // Fetch tactics for the selected map/side
+  useEffect(() => {
+    const fetchTactics = async () => {
+      if (!room?.mapId) {
+        setMapTactics([]);
+        return;
+      }
+
+      try {
+        setTacticsLoading(true);
+        const publicTactics = await fetchPublicTactics(room.mapId, tacticSide);
+        const personalTactics = user?.uid
+          ? await fetchUserTactics(user.uid, room.mapId, tacticSide)
+          : [];
+        const merged = new Map();
+        [...publicTactics, ...personalTactics].forEach((tactic) => {
+          merged.set(tactic.id, tactic);
+        });
+        setMapTactics(Array.from(merged.values()));
+      } catch (error) {
+        console.error('Error fetching tactics:', error);
+      } finally {
+        setTacticsLoading(false);
+      }
+    };
+
+    fetchTactics();
+  }, [room?.mapId, tacticSide, user?.uid]);
+
   useEffect(() => {
     setPendingTacticId(room?.activeTacticId || null);
   }, [room?.activeTacticId]);
@@ -110,6 +141,10 @@ export default function RoomScreen() {
       setPendingTacticId(filteredTactics[0].id);
     }
   }, [isIGL, filteredTactics, pendingTacticId]);
+
+  useEffect(() => {
+    setPendingTacticId(null);
+  }, [room?.mapId, tacticSide]);
 
   useEffect(() => {
     if (myVote && optimisticVote === myVote) {
@@ -140,27 +175,29 @@ export default function RoomScreen() {
 
   const filteredTactics = useMemo(() => {
     if (!room?.mapId) return [];
-    return TACTICS.filter(
-      (t) =>
-        t.mapId === room.mapId &&
-        (!t.side || t.side === tacticSide) &&
-        (!t.category || t.category === tacticSource),
+    const base = mapTactics.filter(
+      (t) => (t.side || '').toUpperCase() === tacticSide.toUpperCase(),
     );
-  }, [room?.mapId, tacticSide, tacticSource]);
+    if (tacticSource === 'personal') {
+      return base.filter((t) => t.creatorId && t.creatorId === user?.uid);
+    }
+    return base;
+  }, [mapTactics, room?.mapId, tacticSide, tacticSource, user?.uid]);
 
   const activeTactic = useMemo(() => {
     if (!room?.activeTacticId) return null;
-    return TACTICS.find((tactic) => tactic.id === room.activeTacticId) || null;
-  }, [room?.activeTacticId]);
+    return mapTactics.find((tactic) => tactic.id === room.activeTacticId) || null;
+  }, [mapTactics, room?.activeTacticId]);
 
   const selectionLineups = useMemo(() => {
-    if (!activeTactic || !Array.isArray(activeTactic.lineupIds)) return [];
-    if (!activeTactic.lineupIds.length) {
+    if (!activeTactic) return [];
+    const tacticLineupIds = Array.isArray(activeTactic.lineupIds) ? activeTactic.lineupIds : [];
+    if (!tacticLineupIds.length) {
       return mapLineups.filter(
         (lineup) => (lineup.side || '').toUpperCase() === tacticSide.toUpperCase(),
       );
     }
-    return activeTactic.lineupIds
+    return tacticLineupIds
       .map((lineupId) => (
         lineupsById[lineupId] ||
         lineupsById[String(lineupId)] ||
@@ -340,6 +377,8 @@ export default function RoomScreen() {
     const votes = tacticVotes[tactic.id] || [];
     const isMyVote = displayMyVote === tactic.id;
     const isIGLPick = pendingTacticId === tactic.id;
+    const categoryLabel = tactic.category
+      || (tactic.isTextbook ? 'textbook' : tactic.creatorId === user?.uid ? 'personal' : 'community');
     return (
       <TouchableOpacity
         key={tactic.id}
@@ -364,7 +403,7 @@ export default function RoomScreen() {
         <Text style={styles.tacticTitle}>{tactic.title}</Text>
         <Text style={styles.tacticDescription}>{tactic.description}</Text>
         <Text style={styles.tacticMeta}>
-          {tactic.lineupIds.length} grenades - {tactic.side} - {tactic.category}
+          {(tactic.lineupIds || []).length || (tactic.lineups || []).length} grenades - {tactic.side} - {categoryLabel}
         </Text>
         {isIGLPick ? (
           <Text style={styles.iglChoice}>IGL choice</Text>
@@ -605,6 +644,11 @@ export default function RoomScreen() {
         <Text style={styles.sectionTitle}>Vote a tactic</Text>
         {filteredTactics.length ? (
           filteredTactics.map(renderTacticCard)
+        ) : tacticsLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#FF6800" />
+            <Text style={styles.loadingText}>Loading tactics...</Text>
+          </View>
         ) : (
           <Text style={styles.emptyText}>
             No tactics for this map/side yet.
