@@ -15,10 +15,6 @@ import TacticsHubScreen from '../screens/TacticsHubScreen';
 import TacticDetailScreen from '../screens/TacticDetailScreen';
 import TacticsMapSelectScreen from '../screens/TacticsMapSelectScreen';
 import RoomScreen from '../screens/RoomScreen';
-import TacticsHubScreen from '../screens/TacticsHubScreen';
-import TacticDetailScreen from '../screens/TacticDetailScreen';
-import TacticsMapSelectScreen from '../screens/TacticsMapSelectScreen';
-import RoomScreen from '../screens/RoomScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import SearchLineupsScreen from '../screens/SearchLineupsScreen';
@@ -112,47 +108,14 @@ function TacticsStack() {
   );
 }
 
-// Tactics Stack (explore + detail)
-function TacticsStack() {
+// Room Stack
+function RoomStack() {
   return (
     <Stack.Navigator screenOptions={commonStackOptions}>
       <Stack.Screen
-        name="TacticsMapSelect"
-        component={TacticsMapSelectScreen}
-        options={{ title: 'Tactics' }}
-      />
-      <Stack.Screen
-        name="TacticsMain"
-        component={TacticsHubScreen}
-        options={({ route }) => ({
-          title: route.params?.map?.name || 'Tactics'
-        })}
-      />
-      <Stack.Screen
-        name="TacticDetail"
-        component={TacticDetailScreen}
-        options={({ route }) => ({
-          title: route.params?.tactic?.title || 'Tactic'
-        })}
-      />
-      <Stack.Screen
-        name="LineupDetail"
-        component={LineupDetailScreen}
-        options={{ title: 'Lineup Detail' }}
-      />
-      <Stack.Screen
-        name="UserProfile"
-        component={UserProfileScreen}
-        options={({ route }) => ({
-          title: route.params?.username || 'User Profile'
-        })}
-      />
-      <Stack.Screen
-        name="LineupGrid"
-        component={LineupGridScreen}
-        options={({ route }) => ({
-          title: route.params?.map?.name || 'Lineups'
-        })}
+        name="RoomMain"
+        component={RoomScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
@@ -236,8 +199,6 @@ export default function AppNavigator() {
       <Tab.Screen 
         name="Tactics" 
         component={TacticsStack}
-        name="Tactics" 
-        component={TacticsStack}
         options={{ headerShown: false }}
       />
       <Tab.Screen 
@@ -250,7 +211,7 @@ export default function AppNavigator() {
       />
       <Tab.Screen 
         name="Room" 
-        component={RoomScreen}
+        component={RoomStack}
         options={{ headerShown: false }}
       />
       <Tab.Screen 
