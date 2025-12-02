@@ -1,3 +1,4 @@
+// screens/PreviewPostScreen.js
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
@@ -7,8 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import { createLineupPost, updateLineupPost } from '../services/postService';
 
 export default function PreviewPostScreen({ route, navigation }) {
-  const { postData, isEditing, lineupId } = route.params;
-  const { saveDraft } = useDrafts();
+  const { postData, isEditing, lineupId, draftId } = route.params;
+  const { saveDraft, deleteDraftAfterPost } = useDrafts();
   const { currentUser } = useAuth();
   const [posting, setPosting] = useState(false);
 
@@ -31,17 +32,16 @@ export default function PreviewPostScreen({ route, navigation }) {
             {
               text: 'View Post',
               onPress: () => {
-                navigation.navigate('Home');
-                // Navigate to the updated post after a short delay
-                setTimeout(() => {
-                  navigation.navigate('LineupDetail', { lineupId });
-                }, 100);
+                navigation.getParent()?.navigate('Home', {
+                  screen: 'LineupDetail',
+                  params: { lineupId },
+                });
               },
             },
             {
               text: 'OK',
               onPress: () => {
-                navigation.navigate('Profile');
+                navigation.getParent()?.navigate('Profile');
               },
             },
           ]
@@ -49,6 +49,12 @@ export default function PreviewPostScreen({ route, navigation }) {
       } else {
         // Create new post
         const newLineupId = await createLineupPost(postData, currentUser);
+        
+        // DELETE DRAFT after successful post
+        if (draftId) {
+          console.log('Deleting draft after successful post:', draftId);
+          await deleteDraftAfterPost(draftId);
+        }
         
         setPosting(false);
         
@@ -59,17 +65,19 @@ export default function PreviewPostScreen({ route, navigation }) {
             {
               text: 'View Post',
               onPress: () => {
-                navigation.navigate('Home');
-                // Navigate to the new post after a short delay
-                setTimeout(() => {
-                  navigation.navigate('LineupDetail', { lineupId: newLineupId });
-                }, 100);
+                navigation.getParent()?.navigate('Home', {
+                  screen: 'LineupDetail',
+                  params: { lineupId: newLineupId },
+                });
               },
             },
             {
               text: 'Post Another',
               onPress: () => {
-                navigation.navigate('PostMain', { shouldReset: true });
+                navigation.getParent()?.navigate('Post', {
+                  screen: 'PostMain',
+                  params: { shouldReset: true },
+                });
               },
             },
           ]
@@ -96,7 +104,7 @@ export default function PreviewPostScreen({ route, navigation }) {
         {
           text: 'OK',
           onPress: () => {
-            navigation.navigate('Profile');
+            navigation.getParent()?.navigate('Profile');
           },
         },
       ]

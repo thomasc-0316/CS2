@@ -1,4 +1,5 @@
-import React from 'react';
+// navigation/AppNavigator.js
+import React, { useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -18,7 +19,6 @@ import EditProfileScreen from '../screens/EditProfileScreen';
 import SearchLineupsScreen from '../screens/SearchLineupsScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
 import PlayerSearchScreen from '../screens/PlayerSearchScreen';
-// Creator profiles now use the unified UserProfileScreen
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -51,38 +51,12 @@ const commonStackOptions = ({ navigation, route }) => ({
 // Home Stack
 function HomeStack() {
   return (
-    <Stack.Navigator
-      screenOptions={commonStackOptions}
-    >
-      <Stack.Screen
-        name="HomeMain"
-        component={HomeScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="LineupGrid"
-        component={LineupGridScreen}
-        options={({ route }) => ({
-          title: route.params?.map?.name || 'Lineups'
-        })}
-      />
-      <Stack.Screen
-        name="LineupDetail"
-        component={LineupDetailScreen}
-        options={{ title: 'Lineup Detail' }}
-      />
-      <Stack.Screen
-        name="UserProfile"
-        component={UserProfileScreen}
-        options={({ route }) => ({
-          title: route.params?.username || 'User Profile'
-        })}
-      />
-      <Stack.Screen
-        name="PlayerSearch"
-        component={PlayerSearchScreen}
-        options={{ title: 'Find Player' }}
-      />
+    <Stack.Navigator screenOptions={commonStackOptions}>
+      <Stack.Screen name="HomeMain" component={HomeScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="LineupGrid" component={LineupGridScreen} options={({ route }) => ({ title: route.params?.map?.name || 'Lineups' })} />
+      <Stack.Screen name="LineupDetail" component={LineupDetailScreen} options={{ title: 'Lineup Detail' }} />
+      <Stack.Screen name="UserProfile" component={UserProfileScreen} options={({ route }) => ({ title: route.params?.username || 'User Profile' })} />
+      <Stack.Screen name="PlayerSearch" component={PlayerSearchScreen} options={{ title: 'Find Player' }} />
     </Stack.Navigator>
   );
 }
@@ -90,56 +64,31 @@ function HomeStack() {
 // Hot Stack
 function HotStack() {
   return (
-    <Stack.Navigator
-      screenOptions={commonStackOptions}
-    >
-      <Stack.Screen
-        name="HotMain"
-        component={HotScreen}
-        options={{ title: '🔥 Hot Lineups' }}
-      />
-      <Stack.Screen
-        name="LineupDetail"
-        component={LineupDetailScreen}
-        options={{ title: 'Lineup Detail' }}
-      />
-      <Stack.Screen
-        name="UserProfile"
-        component={UserProfileScreen}
-        options={({ route }) => ({
-          title: route.params?.username || 'User Profile'
-        })}
-      />
+    <Stack.Navigator screenOptions={commonStackOptions}>
+      <Stack.Screen name="HotMain" component={HotScreen} options={{ title: '🔥 Hot Lineups' }} />
+      <Stack.Screen name="LineupDetail" component={LineupDetailScreen} options={{ title: 'Lineup Detail' }} />
+      <Stack.Screen name="UserProfile" component={UserProfileScreen} options={({ route }) => ({ title: route.params?.username || 'User Profile' })} />
     </Stack.Navigator>
   );
 }
 
-// Post Stack (to include Preview)
+// Post Stack
 function PostStack() {
   return (
-    <Stack.Navigator
-      screenOptions={commonStackOptions}
-    >
+    <Stack.Navigator screenOptions={commonStackOptions}>
       <Stack.Screen 
         name="PostMain" 
         component={PostScreen}
         options={({ navigation }) => ({
           title: 'Create Lineup',
           headerLeft: () => (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Home')}
-              style={{ marginLeft: 10 }}
-            >
+            <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Home')} style={{ marginLeft: 10 }}>
               <Ionicons name="close" size={28} color="#fff" />
             </TouchableOpacity>
           ),
         })}
       />
-      <Stack.Screen 
-        name="PreviewPost" 
-        component={PreviewPostScreen}
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="PreviewPost" component={PreviewPostScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 }
@@ -147,41 +96,19 @@ function PostStack() {
 // Profile Stack
 function ProfileStack() {
   return (
-    <Stack.Navigator
-      screenOptions={commonStackOptions}
-    >
-      <Stack.Screen
-        name="ProfileMain"
-        component={ProfileScreen}
-        options={{ title: 'Profile' }}
-      />
-      <Stack.Screen
-        name="EditProfile"
-        component={EditProfileScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="SearchLineups"
-        component={SearchLineupsScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="LineupDetail"
-        component={LineupDetailScreen}
-        options={{ title: 'Lineup Detail' }}
-      />
-      <Stack.Screen
-        name="UserProfile"
-        component={UserProfileScreen}
-        options={({ route }) => ({
-          title: route.params?.username || 'User Profile'
-        })}
-      />
+    <Stack.Navigator screenOptions={commonStackOptions}>
+      <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ title: 'Profile' }} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="SearchLineups" component={SearchLineupsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="LineupDetail" component={LineupDetailScreen} options={{ title: 'Lineup Detail' }} />
+      <Stack.Screen name="UserProfile" component={UserProfileScreen} options={({ route }) => ({ title: route.params?.username || 'User Profile' })} />
     </Stack.Navigator>
   );
 }
 
 export default function AppNavigator() {
+  const postScreenRef = useRef(null);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -221,16 +148,8 @@ export default function AppNavigator() {
         },
       })}
     >
-      <Tab.Screen 
-        name="Home" 
-        component={HomeStack}
-        options={{ headerShown: false }}
-      />
-      <Tab.Screen 
-        name="Hot" 
-        component={HotStack}
-        options={{ headerShown: false }}
-      />
+      <Tab.Screen name="Home" component={HomeStack} options={{ headerShown: false }} />
+      <Tab.Screen name="Hot" component={HotStack} options={{ headerShown: false }} />
       <Tab.Screen 
         name="Post" 
         component={PostStack}
@@ -238,17 +157,21 @@ export default function AppNavigator() {
           headerShown: false,
           tabBarLabel: '',
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            // Prevent default navigation
+            e.preventDefault();
+            
+            // Navigate to Post tab and trigger modal
+            navigation.navigate('Post', {
+              screen: 'PostMain',
+              params: { shouldShowModal: true },
+            });
+          },
+        })}
       />
-      <Tab.Screen 
-        name="Tactics" 
-        component={TacticsScreen}
-        options={{ headerShown: false }}
-      />
-      <Tab.Screen 
-        name="Profile" 
-        component={ProfileStack}
-        options={{ headerShown: false }}
-      />
+      <Tab.Screen name="Tactics" component={TacticsScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="Profile" component={ProfileStack} options={{ headerShown: false }} />
     </Tab.Navigator>
   );
 }
