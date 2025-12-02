@@ -138,7 +138,7 @@ export default function CreateTacticFromFavoritesScreen({ navigation, route }) {
       });
       navigation.navigate('TacticsMain', {
         map,
-        startTab: 'my',
+        startTab: 'explore',
         refresh: Date.now(),
       });
     } catch (err) {

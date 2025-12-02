@@ -288,16 +288,21 @@ export default function TacticsHubScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.tabSwitchWrapper}>
-        <View style={styles.tabSwitch}>
+      <View style={styles.topHeader}>
+        <View style={styles.tabContainer}>
           {['explore', 'my'].map((tab) => (
             <TouchableOpacity
               key={tab}
-              style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
+              style={[styles.headerTab, activeTab === tab && styles.headerTabActive]}
               onPress={() => setActiveTab(tab)}
               activeOpacity={0.85}
             >
-              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+              <Text
+                style={[
+                  styles.headerTabText,
+                  activeTab === tab && styles.headerTabTextActive,
+                ]}
+              >
                 {tab === 'explore' ? 'Explore' : 'My tactics'}
               </Text>
             </TouchableOpacity>
@@ -339,48 +344,50 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
     paddingTop: 0,
   },
-  tabSwitch: {
-    flexDirection: 'row',
-    backgroundColor: '#111',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-    overflow: 'hidden',
-  },
-  tabPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  tabPillActive: {
-    backgroundColor: '#FF6800',
-  },
-  tabText: {
-    color: '#888',
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  tabTextActive: {
-    color: '#1a1a1a',
-  },
-  tabSwitchWrapper: {
+  topHeader: {
+    paddingBottom: 8,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 6,
-    alignItems: 'flex-end',
+    paddingTop: 8,
+    backgroundColor: '#0a0a0a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#2a2a2a',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    gap: 20,
+    justifyContent: 'center',
+  },
+  headerTab: {
+    paddingVertical: 6,
+  },
+  headerTabActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#FF6800',
+  },
+  headerTabText: {
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#888',
+  },
+  headerTabTextActive: {
+    color: '#fff',
+    fontWeight: '600',
   },
   sideToggleRow: {
     flexDirection: 'row',
     paddingHorizontal: 14,
-    gap: 10,
+    gap: 12,
     paddingBottom: 10,
+    marginTop: 12,
   },
   sideToggle: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: '#1f1f1f',
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: '#1a1a1a',
     borderWidth: 1,
-    borderColor: '#2f2f2f',
+    borderColor: '#3a3a3a',
     alignItems: 'center',
   },
   sideToggleActive: {
