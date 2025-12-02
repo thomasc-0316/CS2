@@ -1,3 +1,4 @@
+// screens/PostScreen.js
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -23,6 +24,7 @@ import AutoSaveIndicator from '../components/AutoSaveIndicator';
 import ImageCropModal from '../components/ImageCropModal';
 import DraftSelectionModal from '../components/DraftSelectionModal';
 import { useDrafts } from '../context/DraftsContext';
+import { MAPS } from '../data/maps';
 
 export default function PostScreen({ navigation, route }) {
   const { createNewDraft, deleteDraftAfterPost, currentDraftId, loadDraft } = useDrafts();
@@ -41,6 +43,7 @@ export default function PostScreen({ navigation, route }) {
   } = useUndoRedo({
     title: '',
     description: '',
+    mapId: '', // NEW: Map selection
     side: '',
     site: '',
     nadeType: '',
@@ -55,6 +58,7 @@ export default function PostScreen({ navigation, route }) {
   const {
     title,
     description,
+    mapId,
     side,
     site,
     nadeType,
@@ -89,10 +93,11 @@ export default function PostScreen({ navigation, route }) {
   useEffect(() => {
     if (route.params?.loadDraft) {
       const draft = route.params.loadDraft;
-      setLoadedDraftId(draft.id); // Track which draft we loaded
+      setLoadedDraftId(draft.id);
       setFormState({
         title: draft.title || '',
         description: draft.description || '',
+        mapId: draft.mapId || '',
         side: draft.side || '',
         site: draft.site || '',
         nadeType: draft.nadeType || '',
@@ -103,8 +108,6 @@ export default function PostScreen({ navigation, route }) {
         moreDetailsImage: draft.moreDetailsImage || draft.thirdPersonImage || null,
       });
       clearHistory();
-
-      // Clear the param
       navigation.setParams({ loadDraft: undefined });
     } else if (route.params?.editLineup) {
       const lineup = route.params.editLineup;
@@ -113,6 +116,7 @@ export default function PostScreen({ navigation, route }) {
       setFormState({
         title: lineup.title || '',
         description: lineup.description || '',
+        mapId: lineup.mapId || 'dust2',
         side: lineup.side || '',
         site: lineup.site || '',
         nadeType: lineup.nadeType || '',
@@ -120,26 +124,36 @@ export default function PostScreen({ navigation, route }) {
         standImage: lineup.standImage || null,
         aimImage: lineup.aimImage || null,
         landImage: lineup.landImage || null,
-        moreDetailsImage: lineup.moreDetailsImage || lineup.thirdPersonImage || null,
+        moreDetailsImage: lineup.moreDetailsImage || null,
       });
       clearHistory();
-
-      // Update header title
-      navigation.setOptions({
-        title: 'Edit Lineup',
-      });
-
-      // Clear the param
       navigation.setParams({ editLineup: undefined });
+    } else if (route.params?.shouldReset) {
+      // Reset form when shouldReset param is passed
+      resetForm();
+      setShowDraftModal(true);
+      navigation.setParams({ shouldReset: undefined });
+    } else if (route.params?.shouldShowModal) {
+      // Show modal when tab is pressed (without changing page)
+      const isEmpty = !title && !description && !mapId && !side && !site && !nadeType && 
+                      !standImage && !aimImage && !landImage;
+      
+      if (isEmpty && !isEditMode) {
+        setShowDraftModal(true);
+      }
+      navigation.setParams({ shouldShowModal: undefined });
     }
-  }, [route.params?.loadDraft, route.params?.editLineup]);
+  }, [route.params]);
 
-  // Show draft selection modal on tab focus
+  // Show draft selection modal on tab focus (only if form is empty)
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      // Always show modal when navigating to Post tab (unless editing)
-      if (!isEditMode && !route.params?.loadDraft && !route.params?.editLineup) {
-        // Small delay to let navigation finish
+      // Check if form is empty
+      const isEmpty = !title && !description && !mapId && !side && !site && !nadeType && 
+                      !standImage && !aimImage && !landImage;
+      
+      // Show modal only if form is empty and not editing
+      if (isEmpty && !isEditMode && !route.params?.loadDraft && !route.params?.editLineup) {
         setTimeout(() => {
           setShowDraftModal(true);
         }, 100);
@@ -147,13 +161,14 @@ export default function PostScreen({ navigation, route }) {
     });
 
     return unsubscribe;
-  }, [navigation, isEditMode]);
+  }, [navigation, isEditMode, title, description, mapId, side, site, nadeType, standImage, aimImage, landImage]);
 
-  // Function to reset all fields
+  // Reset form
   const resetForm = () => {
     setFormState({
       title: '',
       description: '',
+      mapId: '',
       side: '',
       site: '',
       nadeType: '',
@@ -167,48 +182,33 @@ export default function PostScreen({ navigation, route }) {
     setSelectedPhoto(null);
     setIsEditMode(false);
     setEditingLineupId(null);
-    setLoadedDraftId(null); // Clear loaded draft
+    setLoadedDraftId(null);
     clearHistory();
-
-    // Reset header title
-    navigation.setOptions({
-      title: 'Create Lineup',
-    });
   };
 
-  // Set up header buttons (Reset + Undo/Redo)
+  // Header buttons
   useEffect(() => {
     navigation.setOptions({
-      headerLeft: () => (
-        <View style={styles.headerLeft}>
-          <TouchableOpacity
-            onPress={undo}
-            disabled={!canUndo}
-            style={[styles.undoRedoButton, !canUndo && styles.undoRedoButtonDisabled]}
-          >
-            <Ionicons
-              name="arrow-undo"
-              size={22}
+      headerRight: () => (
+        <View style={{ flexDirection: 'row', gap: 15, marginRight: 10 }}>
+          <TouchableOpacity onPress={undo} disabled={!canUndo}>
+            <Ionicons 
+              name="arrow-undo-outline" 
+              size={24} 
               color={canUndo ? '#FF6800' : '#666'}
             />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={redo}
-            disabled={!canRedo}
-            style={[styles.undoRedoButton, !canRedo && styles.undoRedoButtonDisabled]}
-          >
-            <Ionicons
-              name="arrow-redo"
-              size={22}
+          <TouchableOpacity onPress={redo} disabled={!canRedo}>
+            <Ionicons 
+              name="arrow-redo-outline" 
+              size={24} 
               color={canRedo ? '#FF6800' : '#666'}
             />
           </TouchableOpacity>
+          <TouchableOpacity onPress={handleReset}>
+            <Ionicons name="refresh-outline" size={24} color="#fff" />
+          </TouchableOpacity>
         </View>
-      ),
-      headerRight: () => (
-        <TouchableOpacity onPress={handleReset} style={{ marginRight: 10 }}>
-          <Ionicons name="refresh-outline" size={24} color="#fff" />
-        </TouchableOpacity>
       ),
     });
   }, [navigation, canUndo, canRedo]);
@@ -276,37 +276,30 @@ export default function PostScreen({ navigation, route }) {
 
   const confirmImageSelection = async () => {
     if (selectedPhoto && activeImageSlot) {
-      // Get the actual file URI
       const assetInfo = await MediaLibrary.getAssetInfoAsync(selectedPhoto.id);
       const imageUri = assetInfo.localUri || assetInfo.uri;
 
-      // Store which slot this image is for
       setCropImageSlot(activeImageSlot);
       setCropImageUri(imageUri);
 
-      // Clear selection state
+      // IMPORTANT: Clear active slot when opening crop modal
       setActiveImageSlot(null);
       setSelectedPhoto(null);
 
-      // Open crop modal
       setShowCropModal(true);
     }
   };
 
-  // Handle cropped image confirmation
   const handleCroppedImage = (croppedUri) => {
-    // Set the cropped image to the appropriate slot
     const updates = {};
     updates[`${cropImageSlot}Image`] = croppedUri;
     updateFormState(updates);
 
-    // Close modal and clear state
     setShowCropModal(false);
     setCropImageUri(null);
     setCropImageSlot(null);
   };
 
-  // Handle crop modal cancel
   const handleCropCancel = () => {
     setShowCropModal(false);
     setCropImageUri(null);
@@ -322,6 +315,10 @@ export default function PostScreen({ navigation, route }) {
     // Validation
     if (!title.trim()) {
       Alert.alert('Missing Title', 'Please enter a title for your lineup.');
+      return;
+    }
+    if (!mapId) {
+      Alert.alert('Missing Map', 'Please select a map.');
       return;
     }
     if (!side) {
@@ -341,7 +338,6 @@ export default function PostScreen({ navigation, route }) {
       return;
     }
 
-    // Navigate to preview
     navigation.navigate('PreviewPost', {
       postData: {
         title,
@@ -354,26 +350,12 @@ export default function PostScreen({ navigation, route }) {
         aimImage,
         landImage,
         moreDetailsImage,
-        mapId: 'dust2', // Default for now
+        mapId: mapId,
       },
       isEditing: isEditMode,
       lineupId: editingLineupId,
+      draftId: loadedDraftId, // PASS THE DRAFT ID so it can be deleted after posting
     });
-  };
-
-  const renderPickerOption = (value, label, currentValue, setValue) => {
-    const isSelected = currentValue === value;
-    return (
-      <TouchableOpacity
-        key={value}
-        style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
-        onPress={() => updateFormState({ [setValue.name.replace('set', '').toLowerCase()]: value })}
-      >
-        <Text style={[styles.pickerText, isSelected && styles.pickerTextSelected]}>
-          {label}
-        </Text>
-      </TouchableOpacity>
-    );
   };
 
   const renderPickerOptionSimple = (value, label, currentValue, stateKey) => {
@@ -386,6 +368,26 @@ export default function PostScreen({ navigation, route }) {
       >
         <Text style={[styles.pickerText, isSelected && styles.pickerTextSelected]}>
           {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderMapOption = (map) => {
+    const isSelected = mapId === map.id;
+    return (
+      <TouchableOpacity
+        key={map.id}
+        style={[styles.mapOption, isSelected && styles.mapOptionSelected]}
+        onPress={() => updateFormState({ mapId: map.id })}
+      >
+        <Image 
+          source={map.icon} 
+          style={styles.mapIconImage}
+          contentFit="contain"
+        />
+        <Text style={[styles.mapText, isSelected && styles.mapTextSelected]}>
+          {map.name}
         </Text>
       </TouchableOpacity>
     );
@@ -407,14 +409,13 @@ export default function PostScreen({ navigation, route }) {
         style={[
           styles.imagePlaceholder,
           isActive && styles.imagePlaceholderActive,
-          hasImage && styles.imagePlaceholderFilled,
+          hasImage && !isActive && styles.imagePlaceholderFilled, // Only show filled if NOT active
         ]}
         onPress={() => handleImageSlotTap(slot)}
       >
         {hasImage ? (
           <>
             <Image source={{ uri: image }} style={styles.placeholderImage} contentFit="cover" />
-            {/* Delete button */}
             <TouchableOpacity
               style={styles.deleteImageButton}
               onPress={handleDelete}
@@ -463,7 +464,6 @@ export default function PostScreen({ navigation, route }) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Auto-save indicator */}
       <AutoSaveIndicator status={saveStatus} lastSaved={lastSaved} />
 
       {/* Top Half - Form */}
@@ -498,6 +498,16 @@ export default function PostScreen({ navigation, route }) {
             numberOfLines={3}
           />
           <Text style={styles.charCount}>{description.length}/200</Text>
+        </View>
+
+        {/* Map Selection - FIRST */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>
+            Map<Text style={styles.requiredAsterisk}> *</Text>
+          </Text>
+          <View style={styles.mapGrid}>
+            {MAPS.map(map => renderMapOption(map))}
+          </View>
         </View>
 
         {/* Side Picker */}
@@ -580,7 +590,7 @@ export default function PostScreen({ navigation, route }) {
         ) : photos.length === 0 ? (
           <View style={styles.emptyGallery}>
             <Ionicons name="images-outline" size={60} color="#666" />
-            <Text style={styles.emptyText}>No photos found</Text>
+            <Text style={styles.emptyText}>No photos found in library</Text>
           </View>
         ) : (
           <FlatList
@@ -591,21 +601,21 @@ export default function PostScreen({ navigation, route }) {
             contentContainerStyle={styles.galleryGrid}
           />
         )}
-
-        {/* Confirm/Cancel buttons for selection */}
-        {selectedPhoto && (
-          <View style={styles.selectionActions}>
-            <TouchableOpacity style={styles.cancelButton} onPress={cancelSelection}>
-              <Ionicons name="close" size={20} color="#fff" />
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.confirmButton} onPress={confirmImageSelection}>
-              <Ionicons name="checkmark" size={20} color="#fff" />
-              <Text style={styles.confirmButtonText}>Confirm</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
+
+      {/* Selection Actions */}
+      {selectedPhoto && (
+        <View style={styles.selectionActions}>
+          <TouchableOpacity style={styles.cancelButton} onPress={cancelSelection}>
+            <Ionicons name="close" size={18} color="#fff" />
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.confirmButton} onPress={confirmImageSelection}>
+            <Ionicons name="checkmark" size={18} color="#fff" />
+            <Text style={styles.confirmButtonText}>Confirm</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Image Crop Modal */}
       <ImageCropModal
@@ -618,18 +628,15 @@ export default function PostScreen({ navigation, route }) {
       {/* Draft Selection Modal */}
       <DraftSelectionModal
         visible={showDraftModal}
+        onClose={() => setShowDraftModal(false)}
         onSelectDraft={(draft) => {
-          loadDraft(draft.id); // This sets currentDraftId
           navigation.setParams({ loadDraft: draft });
           setShowDraftModal(false);
         }}
         onCreateNew={() => {
-          // Clear form and create new draft
-          resetForm();
-          createNewDraft(); // This creates and sets new currentDraftId
+          // Just close the modal - form is already empty
           setShowDraftModal(false);
         }}
-        onClose={() => setShowDraftModal(false)}
       />
     </KeyboardAvoidingView>
   );
@@ -640,23 +647,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0a0a0a',
   },
-  headerLeft: {
-    flexDirection: 'row',
-    marginLeft: 10,
-    gap: 8,
-  },
-  undoRedoButton: {
-    padding: 6,
-  },
-  undoRedoButtonDisabled: {
-    opacity: 0.3,
-  },
   topHalf: {
     flex: 1,
   },
   formContainer: {
     padding: 20,
-    paddingBottom: 40,
   },
   inputGroup: {
     marginBottom: 20,
@@ -669,11 +664,9 @@ const styles = StyleSheet.create({
   },
   requiredAsterisk: {
     color: '#FF6800',
-    fontSize: 16,
   },
   optionalLabel: {
     color: '#666',
-    fontSize: 14,
     fontWeight: 'normal',
   },
   textInput: {
@@ -695,30 +688,63 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginTop: 4,
   },
+  mapGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  mapOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a1a1a',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#333',
+    gap: 8,
+  },
+  mapOptionSelected: {
+    backgroundColor: '#2a2a2a',
+    borderColor: '#FF6800',
+  },
+  mapIconImage: {
+    width: 24,
+    height: 24,
+  },
+  mapText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ccc',
+  },
+  mapTextSelected: {
+    color: '#FF6800',
+  },
   pickerRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   pickerOption: {
     flex: 1,
     backgroundColor: '#1a1a1a',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
-    padding: 12,
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#333',
   },
   pickerOptionSelected: {
-    backgroundColor: '#FF6800',
+    backgroundColor: '#2a2a2a',
     borderColor: '#FF6800',
   },
   pickerText: {
     fontSize: 14,
-    color: '#999',
     fontWeight: '600',
+    color: '#ccc',
   },
   pickerTextSelected: {
-    color: '#fff',
+    color: '#FF6800',
   },
   imagesTitle: {
     fontSize: 18,
@@ -742,7 +768,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
   },
   imagePlaceholderFilled: {
-    borderColor: '#FF6800',
+    borderColor: '#10B981',
     borderWidth: 3,
   },
   placeholderImage: {
