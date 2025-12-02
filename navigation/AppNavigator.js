@@ -1,10 +1,9 @@
 // navigation/AppNavigator.js
-import React, { useRef } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -109,6 +108,19 @@ function TacticsStack() {
   );
 }
 
+// Room Stack
+function RoomStack() {
+  return (
+    <Stack.Navigator screenOptions={commonStackOptions}>
+      <Stack.Screen
+        name="RoomMain"
+        component={RoomScreen}
+        options={{ headerShown: false }}
+      />
+    </Stack.Navigator>
+  );
+}
+
 // Post Stack
 function PostStack() {
   return (
@@ -140,8 +152,6 @@ function ProfileStack() {
 }
 
 export default function AppNavigator() {
-  const postScreenRef = useRef(null);
-
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -152,14 +162,14 @@ export default function AppNavigator() {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Tactics') {
             iconName = focused ? 'layers' : 'layers-outline';
+          } else if (route.name === 'Room') {
+            iconName = focused ? 'people' : 'people-outline';
           } else if (route.name === 'Post') {
             return (
               <View style={styles.postButton}>
                 <Ionicons name="add" size={28} color="#fff" />
               </View>
             );
-          } else if (route.name === 'Room') {
-            iconName = focused ? 'people' : 'people-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person-circle' : 'person-circle-outline';
           }
@@ -187,8 +197,8 @@ export default function AppNavigator() {
         options={{ headerShown: false }}
       />
       <Tab.Screen 
-        name="Hot" 
-        component={HotStack}
+        name="Tactics" 
+        component={TacticsStack}
         options={{ headerShown: false }}
       />
       <Tab.Screen 
@@ -200,8 +210,8 @@ export default function AppNavigator() {
         }}
       />
       <Tab.Screen 
-        name="Tactics" 
-        component={TacticsScreen}
+        name="Room" 
+        component={RoomStack}
         options={{ headerShown: false }}
       />
       <Tab.Screen 
