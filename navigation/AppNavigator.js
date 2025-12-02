@@ -79,14 +79,10 @@ function PostStack() {
       <Stack.Screen 
         name="PostMain" 
         component={PostScreen}
-        options={({ navigation }) => ({
+        options={{
           title: 'Create Lineup',
-          headerLeft: () => (
-            <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Home')} style={{ marginLeft: 10 }}>
-              <Ionicons name="close" size={28} color="#fff" />
-            </TouchableOpacity>
-          ),
-        })}
+          // headerLeft will be set by PostScreen itself
+        }}
       />
       <Stack.Screen name="PreviewPost" component={PreviewPostScreen} options={{ headerShown: false }} />
     </Stack.Navigator>

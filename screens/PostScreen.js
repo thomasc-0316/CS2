@@ -189,6 +189,18 @@ export default function PostScreen({ navigation, route }) {
   // Header buttons
   useEffect(() => {
     navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity 
+          onPress={() => {
+            // Reset form and navigate to Home
+            resetForm();
+            navigation.getParent()?.navigate('Home');
+          }} 
+          style={{ marginLeft: 10 }}
+        >
+          <Ionicons name="close" size={28} color="#fff" />
+        </TouchableOpacity>
+      ),
       headerRight: () => (
         <View style={{ flexDirection: 'row', gap: 15, marginRight: 10 }}>
           <TouchableOpacity onPress={undo} disabled={!canUndo}>
