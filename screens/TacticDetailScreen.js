@@ -12,9 +12,14 @@ export default function TacticDetailScreen({ navigation, route }) {
   const [lineups, setLineups] = useState(incomingLineups);
   const [loading, setLoading] = useState(!incomingLineups.length);
 
+  const tacticLineupIds = useMemo(
+    () => tactic?.lineupIds || tactic?.linupIds || [],
+    [tactic?.lineupIds, tactic?.linupIds],
+  );
+
   const lineupIdSet = useMemo(
-    () => new Set((tactic?.lineupIds || []).map((id) => String(id))),
-    [tactic?.lineupIds],
+    () => new Set(tacticLineupIds.map((id) => String(id))),
+    [tacticLineupIds],
   );
 
   useEffect(() => {

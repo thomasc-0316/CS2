@@ -19,7 +19,11 @@ const docToTactic = (docSnap) => {
     description: data.description || '',
     mapId: data.mapId,
     side: (data.side || 'T').toUpperCase(),
-    lineupIds: Array.isArray(data.lineupIds) ? data.lineupIds : [],
+    lineupIds: Array.isArray(data.lineupIds)
+      ? data.lineupIds
+      : Array.isArray(data.linupIds) // legacy typo
+        ? data.linupIds
+        : [],
     tags: data.tags || [],
     isTextbook: !!data.isTextbook,
     isPublic: data.isPublic !== false,

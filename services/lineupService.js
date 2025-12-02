@@ -116,6 +116,31 @@ export const getLineupsByCreator = async (creatorId) => {
   }
 };
 
+// Get a creator's lineups for a specific map/side (includes private)
+export const getCreatorLineupsByMapAndSide = async (creatorId, mapId, side) => {
+  if (!creatorId) return [];
+  try {
+    const filters = [where('creatorId', '==', creatorId)];
+    if (mapId) filters.push(where('mapId', '==', mapId));
+    if (side) filters.push(where('side', '==', side));
+
+    const q = query(
+      collection(db, 'lineups'),
+      ...filters,
+      orderBy('uploadedAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }));
+  } catch (error) {
+    console.error('Error fetching creator lineups by map/side:', error);
+    return [];
+  }
+};
+
 // Get single lineup by ID
 export const getLineupById = async (lineupId) => {
   try {

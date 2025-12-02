@@ -14,6 +14,7 @@ import PreviewPostScreen from '../screens/PreviewPostScreen';
 import TacticsHubScreen from '../screens/TacticsHubScreen';
 import TacticDetailScreen from '../screens/TacticDetailScreen';
 import TacticsMapSelectScreen from '../screens/TacticsMapSelectScreen';
+import CreateTacticFromFavoritesScreen from '../screens/CreateTacticFromFavoritesScreen';
 import RoomScreen from '../screens/RoomScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
@@ -77,6 +78,11 @@ function TacticsStack() {
         options={({ route }) => ({
           title: route.params?.map?.name || 'Tactics'
         })}
+      />
+      <Stack.Screen
+        name="CreateTacticFromFavorites"
+        component={CreateTacticFromFavoritesScreen}
+        options={{ title: 'Build tactic' }}
       />
       <Stack.Screen
         name="TacticDetail"
