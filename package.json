@@ -32,5 +32,17 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0"
   },
-  "private": true
+  "private": true,
+  "description": "## Authentication - Firebase Auth powers email/password and Google sign-in using the single app initialized in `firebaseConfig.js` (no extra `initializeApp` calls). - Sessions persist with `getReactNativePersistence(AsyncStorage)`, so users stay signed in across restarts. - Navigation is gated by auth state in `App.js`: unauthenticated users see the auth stack, authenticated users see the main app.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thomasc-0316/CS2.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/thomasc-0316/CS2/issues"
+  },
+  "homepage": "https://github.com/thomasc-0316/CS2#readme"
 }

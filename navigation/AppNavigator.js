@@ -1,19 +1,24 @@
 // navigation/AppNavigator.js
-import React, { useRef } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
 import LineupGridScreen from '../screens/LineupGridScreen';
 import LineupDetailScreen from '../screens/LineupDetailScreen';
-import HotScreen from '../screens/HotScreen';
 import PostScreen from '../screens/PostScreen';
 import PreviewPostScreen from '../screens/PreviewPostScreen';
-import TacticsScreen from '../screens/TacticsScreen';
+import TacticsHubScreen from '../screens/TacticsHubScreen';
+import TacticDetailScreen from '../screens/TacticDetailScreen';
+import TacticsMapSelectScreen from '../screens/TacticsMapSelectScreen';
+import RoomScreen from '../screens/RoomScreen';
+import TacticsHubScreen from '../screens/TacticsHubScreen';
+import TacticDetailScreen from '../screens/TacticDetailScreen';
+import TacticsMapSelectScreen from '../screens/TacticsMapSelectScreen';
+import RoomScreen from '../screens/RoomScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import SearchLineupsScreen from '../screens/SearchLineupsScreen';
@@ -61,13 +66,94 @@ function HomeStack() {
   );
 }
 
-// Hot Stack
-function HotStack() {
+// Tactics Stack (explore + detail)
+function TacticsStack() {
   return (
     <Stack.Navigator screenOptions={commonStackOptions}>
-      <Stack.Screen name="HotMain" component={HotScreen} options={{ title: '🔥 Hot Lineups' }} />
-      <Stack.Screen name="LineupDetail" component={LineupDetailScreen} options={{ title: 'Lineup Detail' }} />
-      <Stack.Screen name="UserProfile" component={UserProfileScreen} options={({ route }) => ({ title: route.params?.username || 'User Profile' })} />
+      <Stack.Screen
+        name="TacticsMapSelect"
+        component={TacticsMapSelectScreen}
+        options={{ title: 'Tactics' }}
+      />
+      <Stack.Screen
+        name="TacticsMain"
+        component={TacticsHubScreen}
+        options={({ route }) => ({
+          title: route.params?.map?.name || 'Tactics'
+        })}
+      />
+      <Stack.Screen
+        name="TacticDetail"
+        component={TacticDetailScreen}
+        options={({ route }) => ({
+          title: route.params?.tactic?.title || 'Tactic'
+        })}
+      />
+      <Stack.Screen
+        name="LineupDetail"
+        component={LineupDetailScreen}
+        options={{ title: 'Lineup Detail' }}
+      />
+      <Stack.Screen
+        name="UserProfile"
+        component={UserProfileScreen}
+        options={({ route }) => ({
+          title: route.params?.username || 'User Profile'
+        })}
+      />
+      <Stack.Screen
+        name="LineupGrid"
+        component={LineupGridScreen}
+        options={({ route }) => ({
+          title: route.params?.map?.name || 'Lineups'
+        })}
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Tactics Stack (explore + detail)
+function TacticsStack() {
+  return (
+    <Stack.Navigator screenOptions={commonStackOptions}>
+      <Stack.Screen
+        name="TacticsMapSelect"
+        component={TacticsMapSelectScreen}
+        options={{ title: 'Tactics' }}
+      />
+      <Stack.Screen
+        name="TacticsMain"
+        component={TacticsHubScreen}
+        options={({ route }) => ({
+          title: route.params?.map?.name || 'Tactics'
+        })}
+      />
+      <Stack.Screen
+        name="TacticDetail"
+        component={TacticDetailScreen}
+        options={({ route }) => ({
+          title: route.params?.tactic?.title || 'Tactic'
+        })}
+      />
+      <Stack.Screen
+        name="LineupDetail"
+        component={LineupDetailScreen}
+        options={{ title: 'Lineup Detail' }}
+      />
+      <Stack.Screen
+        name="UserProfile"
+        component={UserProfileScreen}
+        options={({ route }) => ({
+          title: route.params?.username || 'User Profile'
+        })}
+      />
+      <Stack.Screen
+        name="LineupGrid"
+        component={LineupGridScreen}
+        options={({ route }) => ({
+          title: route.params?.map?.name || 'Lineups'
+        })}
+      />
     </Stack.Navigator>
   );
 }
@@ -103,8 +189,6 @@ function ProfileStack() {
 }
 
 export default function AppNavigator() {
-  const postScreenRef = useRef(null);
-
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -113,16 +197,16 @@ export default function AppNavigator() {
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Hot') {
-            iconName = focused ? 'flame' : 'flame-outline';
+          } else if (route.name === 'Tactics') {
+            iconName = focused ? 'layers' : 'layers-outline';
           } else if (route.name === 'Post') {
             return (
               <View style={styles.postButton}>
                 <Ionicons name="add" size={28} color="#fff" />
               </View>
             );
-          } else if (route.name === 'Tactics') {
-            iconName = focused ? 'book' : 'book-outline';
+          } else if (route.name === 'Room') {
+            iconName = focused ? 'people' : 'people-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person-circle' : 'person-circle-outline';
           }
@@ -144,8 +228,18 @@ export default function AppNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeStack} options={{ headerShown: false }} />
-      <Tab.Screen name="Hot" component={HotStack} options={{ headerShown: false }} />
+      <Tab.Screen 
+        name="Home" 
+        component={HomeStack}
+        options={{ headerShown: false }}
+      />
+      <Tab.Screen 
+        name="Tactics" 
+        component={TacticsStack}
+        name="Tactics" 
+        component={TacticsStack}
+        options={{ headerShown: false }}
+      />
       <Tab.Screen 
         name="Post" 
         component={PostStack}
@@ -153,21 +247,17 @@ export default function AppNavigator() {
           headerShown: false,
           tabBarLabel: '',
         }}
-        listeners={({ navigation }) => ({
-          tabPress: (e) => {
-            // Prevent default navigation
-            e.preventDefault();
-            
-            // Navigate to Post tab and trigger modal
-            navigation.navigate('Post', {
-              screen: 'PostMain',
-              params: { shouldShowModal: true },
-            });
-          },
-        })}
       />
-      <Tab.Screen name="Tactics" component={TacticsScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="Profile" component={ProfileStack} options={{ headerShown: false }} />
+      <Tab.Screen 
+        name="Room" 
+        component={RoomScreen}
+        options={{ headerShown: false }}
+      />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileStack}
+        options={{ headerShown: false }}
+      />
     </Tab.Navigator>
   );
 }

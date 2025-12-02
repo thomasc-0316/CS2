@@ -11,6 +11,7 @@ import { ProfileProvider } from './context/ProfileContext';
 import { CommentsProvider } from './context/CommentsContext';
 import { FollowProvider } from './context/FollowContext';
 import { TacticsProvider } from './context/TacticsContext';
+import { TacticLibraryProvider } from './context/TacticLibraryContext';
 
 function AppContent() {
   const { currentUser, loading } = useAuth();
@@ -34,15 +35,17 @@ function AppContent() {
         <TacticsProvider>
           <UpvoteProvider>
             <FavoritesProvider>
-              <DraftsProvider>
-                <ProfileProvider>
-                  <CommentsProvider>
-                    <FollowProvider>
-                      <AppNavigator />
-                    </FollowProvider>
-                  </CommentsProvider>
-                </ProfileProvider>
-              </DraftsProvider>
+              <TacticLibraryProvider>
+                <DraftsProvider>
+                  <ProfileProvider>
+                    <CommentsProvider>
+                      <FollowProvider>
+                        <AppNavigator />
+                      </FollowProvider>
+                    </CommentsProvider>
+                  </ProfileProvider>
+                </DraftsProvider>
+              </TacticLibraryProvider>
             </FavoritesProvider>
           </UpvoteProvider>
         </TacticsProvider>
