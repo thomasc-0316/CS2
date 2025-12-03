@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Platform, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Platform, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,7 @@ import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
 import FollowersFollowingModal from '../components/FollowersFollowingModal';
 import { deleteLineupPost } from '../services/postService';
+import MasonryList from '@react-native-seoul/masonry-list';
 
 // Draft card component
 function DraftCard({ item, navigation, onDelete, onEdit }) {
@@ -70,7 +71,7 @@ function DraftCard({ item, navigation, onDelete, onEdit }) {
       </View>
 
       <View style={styles.cardInfo}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{item.title || 'Untitled'}</Text>
+        <Text style={styles.cardTitle}>{item.title || 'Untitled'}</Text>
         <View style={styles.tags}>
           {item.side && <Text style={styles.tag}>{item.side}</Text>}
           {item.site && <Text style={styles.tag}>{item.site}</Text>}
@@ -140,7 +141,7 @@ function LineupCard({ item, navigation, getMapName, getUpvoteCount, canEdit, onE
       )}
 
       <View style={styles.cardInfo}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.cardTitle}>{item.title}</Text>
         <Text style={styles.mapName}>{getMapName(item.mapId)}</Text>
 
         <View style={styles.tags}>
@@ -164,7 +165,7 @@ export default function ProfileScreen() {
   const { getUpvoteCount } = useUpvotes();
   const { drafts, deleteDraft } = useDrafts();
   const { getFollowingCount, getFollowersCount } = useFollow();
-  const { currentUser, logout, updateUserProfile } = useAuth();
+  const { currentUser, updateUserProfile } = useAuth();
   const { profile: storedProfile, updateProfile: updateLocalProfile } = useProfile();
   
   const [activeTab, setActiveTab] = useState('myLineups');
@@ -411,27 +412,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-            } catch (error) {
-              Alert.alert('Error', 'Failed to logout');
-            }
-          }
-        }
-      ]
-    );
-  };
-
   const openFollowersModal = () => {
     setFollowModalTab('followers');
     setFollowModalVisible(true);
@@ -503,18 +483,11 @@ export default function ProfileScreen() {
 
           {/* Action Buttons (right side) */}
           <View style={styles.actionButtons}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.editProfileButton}
               onPress={() => navigation.navigate('EditProfile')}
             >
               <Text style={styles.editProfileText}>Edit Profile</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.settingsButtonMain}
-              onPress={handleLogout}
-            >
-              <Ionicons name="log-out-outline" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
         </View>
@@ -645,27 +618,31 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={activeContent}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={2}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF6800" />
-          </View>
-        ) : renderEmptyState()}
-        contentContainerStyle={styles.grid}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#FF6800"
-            colors={['#FF6800']}
-          />
-        }
-      />
+      {renderHeader()}
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF6800" />
+        </View>
+      ) : activeContent.length === 0 ? (
+        renderEmptyState()
+      ) : (
+        <MasonryList
+          data={activeContent}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id.toString()}
+          numColumns={2}
+          contentContainerStyle={styles.grid}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#FF6800"
+              colors={['#FF6800']}
+            />
+          }
+        />
+      )}
 
       <FollowersFollowingModal
         visible={followModalVisible}
@@ -771,14 +748,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  settingsButtonMain: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#3a3a3a',
-    borderRadius: 6,
-  },
   tabBar: {
     flexDirection: 'row',
     backgroundColor: '#1a1a1a',
@@ -811,20 +780,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   grid: {
-    paddingHorizontal: 5,
+    paddingHorizontal: 12,
     paddingBottom: 5,
   },
   lineupCard: {
-    width: '47%',
-    margin: 5,
+    flex: 1,
+    marginBottom: 6,
+    marginHorizontal: 3,
     backgroundColor: '#1a1a1a',
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
   },
   cardImage: {
     width: '100%',
-    height: 140,
+    aspectRatio: 16 / 9,
     backgroundColor: '#2a2a2a',
   },
   imageLoadingContainer: {
@@ -832,7 +802,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 140,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#2a2a2a',

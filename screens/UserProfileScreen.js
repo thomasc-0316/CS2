@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { useUpvotes } from '../context/UpvoteContext';
 import { useFollow } from '../context/FollowContext';
 import { MAPS } from '../data/maps';
 import { useAuth } from '../context/AuthContext';
+import MasonryList from '@react-native-seoul/masonry-list';
 
 // Lineup card component
 function LineupCard({ item, navigation, getMapName, getUpvoteCount }) {
@@ -42,7 +43,7 @@ function LineupCard({ item, navigation, getMapName, getUpvoteCount }) {
       )}
 
       <View style={styles.cardInfo}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.cardTitle}>{item.title}</Text>
         <Text style={styles.mapName}>{getMapName(item.mapId)}</Text>
 
         <View style={styles.tags}>
@@ -345,28 +346,28 @@ export default function UserProfileScreen({ route }) {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={userLineups}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={2}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={renderEmptyState}
-        contentContainerStyle={styles.grid}
-        removeClippedSubviews={true}
-        maxToRenderPerBatch={10}
-        windowSize={5}
-        initialNumToRender={6}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#FF6800"
-            colors={['#FF6800']}
-            progressBackgroundColor="#3a3a3a"
-          />
-        }
-      />
+      {renderHeader()}
+
+      {userLineups.length === 0 ? (
+        renderEmptyState()
+      ) : (
+        <MasonryList
+          data={userLineups}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id.toString()}
+          numColumns={2}
+          contentContainerStyle={styles.grid}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#FF6800"
+              colors={['#FF6800']}
+              progressBackgroundColor="#3a3a3a"
+            />
+          }
+        />
+      )}
     </View>
   );
 }
@@ -491,20 +492,21 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   grid: {
-    paddingHorizontal: 5,
+    paddingHorizontal: 12,
     paddingBottom: 5,
   },
   lineupCard: {
-    width: '47%',
-    margin: 5,
+    flex: 1,
+    marginBottom: 6,
+    marginHorizontal: 3,
     backgroundColor: '#1a1a1a',
-    borderRadius: 10,
+    borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
   },
   cardImage: {
     width: '100%',
-    height: 120,
+    aspectRatio: 16 / 9,
     backgroundColor: '#3a3a3a',
   },
   imageLoadingContainer: {

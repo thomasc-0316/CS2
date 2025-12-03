@@ -20,7 +20,7 @@ import { storage } from '../firebaseConfig';
 
 export default function EditProfileScreen({ navigation }) {
   const { profile, updateProfile } = useProfile();
-  const { updateUserProfile, currentUser } = useAuth();
+  const { updateUserProfile, currentUser, logout } = useAuth();
   
   // Local state for editing
   const [username, setUsername] = useState(profile.username);
@@ -162,6 +162,27 @@ export default function EditProfileScreen({ navigation }) {
     setProfilePicture(null);
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to logout');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -250,6 +271,13 @@ export default function EditProfileScreen({ navigation }) {
             />
           </View>
         </View>
+
+        {/* Logout Button */}
+        <View style={styles.logoutSection}>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -337,5 +365,22 @@ const styles = StyleSheet.create({
   bioInput: {
     minHeight: 60,
     textAlignVertical: 'top',
+  },
+  logoutSection: {
+    paddingVertical: 40,
+    paddingHorizontal: 15,
+    alignItems: 'center',
+  },
+  logoutButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 40,
+    borderWidth: 1,
+    borderColor: '#ff3b30',
+    borderRadius: 8,
+  },
+  logoutText: {
+    fontSize: 16,
+    color: '#ff3b30',
+    fontWeight: '600',
   },
 });

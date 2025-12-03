@@ -3,17 +3,18 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   Animated,
   TextInput,
   RefreshControl,
   ActivityIndicator
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import LineupCard from '../components/LineupCard';
+import MasonryList from '@react-native-seoul/masonry-list';
 
 export default function LineupGridScreen({ navigation, route }) {
   const { map } = route.params;
@@ -21,13 +22,49 @@ export default function LineupGridScreen({ navigation, route }) {
   const [slideAnim] = useState(new Animated.Value(300));
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);  // ADD THIS
-  const [mapLineups, setMapLineups] = useState([]);  // ADD THIS - Store Firestore lineups
+  const [loading, setLoading] = useState(true);
+  const [mapLineups, setMapLineups] = useState([]);
 
   // Applied filter states (arrays for multi-select)
   const [selectedSides, setSelectedSides] = useState([]);
   const [selectedSites, setSelectedSites] = useState([]);
   const [selectedNadeTypes, setSelectedNadeTypes] = useState([]);
+
+  // Set custom navigation header
+  useEffect(() => {
+    navigation.setOptions({
+      headerTitle: () => (
+        <View style={styles.headerSearchBar}>
+          <Ionicons name="search" size={18} color="#888" />
+          <TextInput
+            style={styles.headerSearchInput}
+            placeholder="Search lineups..."
+            placeholderTextColor="#666"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery !== '' && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={18} color="#888" />
+            </TouchableOpacity>
+          )}
+        </View>
+      ),
+      headerRight: () => (
+        <TouchableOpacity
+          style={styles.headerFilterButton}
+          onPress={openFilter}
+        >
+          <Ionicons name="options" size={20} color="#fff" />
+          {activeFilterCount > 0 && (
+            <View style={styles.headerFilterBadge}>
+              <Text style={styles.headerFilterBadgeText}>{activeFilterCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, searchQuery, activeFilterCount]);
 
   // Temporary filter states (for the panel before applying)
   const [tempSides, setTempSides] = useState([]);
@@ -169,38 +206,8 @@ export default function LineupGridScreen({ navigation, route }) {
 
   return (
     <View style={styles.container}>
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search lineups..."
-          placeholderTextColor="#666"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery !== '' && (
-          <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
-            <Ionicons name="close-circle" size={20} color="#888" />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Filter Button */}
-      <View style={styles.filterButtonContainer}>
-        <TouchableOpacity style={styles.filterButton} onPress={openFilter}>
-          <Ionicons name="options" size={20} color="#fff" />
-          <Text style={styles.filterButtonText}>Filters</Text>
-          {activeFilterCount > 0 && (
-            <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
       {/* Lineup Grid */}
-      <FlatList
+      <MasonryList
         data={filteredLineups}
         renderItem={({ item }) => (
           <LineupCard lineup={item} navigation={navigation} />
@@ -208,7 +215,6 @@ export default function LineupGridScreen({ navigation, route }) {
         keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         contentContainerStyle={styles.grid}
-        columnWrapperStyle={styles.row}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6800" />
         }
@@ -323,70 +329,75 @@ const styles = StyleSheet.create({
     marginTop: 15,
     fontSize: 16,
   },
-  searchContainer: {
+  headerLeftContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 8,
+  },
+  headerBackButton: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerMapIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#2a2a2a',
+  },
+  headerMapImage: {
+    width: '100%',
+    height: '100%',
+  },
+  headerSearchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#2a2a2a',
-    marginHorizontal: 15,
-    marginTop: 10,
-    marginBottom: 5,
     paddingHorizontal: 12,
-    borderRadius: 10,
-    height: 45,
+    borderRadius: 8,
+    height: 36,
+    width: 250,
+    gap: 8,
   },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
+  headerSearchInput: {
     flex: 1,
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
+    height: '100%',
   },
-  clearButton: {
-    padding: 5,
-  },
-  filterButtonContainer: {
-    paddingHorizontal: 15,
-    paddingBottom: 10,
-  },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  headerFilterButton: {
+    width: 36,
+    height: 36,
     justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: '#2a2a2a',
-    paddingVertical: 10,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3a3a3a',
+    position: 'relative',
+    marginRight: 8,
   },
-  filterButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  filterBadge: {
+  headerFilterBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
     backgroundColor: '#FF6800',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
   },
-  filterBadgeText: {
+  headerFilterBadgeText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
   },
   grid: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingBottom: 10,
-  },
-  row: {
-    justifyContent: 'space-between',
-    paddingHorizontal: 5,
   },
   emptyState: {
     flex: 1,
