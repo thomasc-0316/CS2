@@ -69,8 +69,8 @@ export default function LineupCard({ lineup, navigation, rankBadge }) {
           </TouchableOpacity>
         )}
 
-        <Text style={styles.cardTitle} numberOfLines={1}>{lineup.title}</Text>
-        <Text style={styles.cardDescription} numberOfLines={2}>{lineup.description}</Text>
+        <Text style={styles.cardTitle}>{lineup.title}</Text>
+        <Text style={styles.cardDescription}>{lineup.description}</Text>
         
         <View style={styles.tags}>
           <Text style={styles.tag}>{lineup.side}</Text>
@@ -84,17 +84,18 @@ export default function LineupCard({ lineup, navigation, rankBadge }) {
 
 const styles = StyleSheet.create({
   lineupCard: {
-    width: '48%',
+    flex: 1,
     backgroundColor: '#2a2a2a',
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: 'hidden',
-    marginBottom: 10,
+    marginBottom: 6,
+    marginHorizontal: 3,
     borderWidth: 1,
     borderColor: '#3a3a3a',
   },
   cardImage: {
     width: '100%',
-    height: 150,
+    aspectRatio: 16 / 9,
     backgroundColor: '#3a3a3a',
   },
   imageLoadingContainer: {
@@ -102,7 +103,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 150,
+    bottom: 0,
     backgroundColor: '#3a3a3a',
     justifyContent: 'center',
     alignItems: 'center',

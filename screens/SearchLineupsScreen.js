@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   Image,
   TextInput,
@@ -18,6 +17,7 @@ import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useFavorites } from '../context/FavoritesContext';
+import MasonryList from '@react-native-seoul/masonry-list';
 
 export default function SearchLineupsScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -115,7 +115,7 @@ export default function SearchLineupsScreen({ navigation }) {
       />
       
       <View style={styles.cardInfo}>
-        <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.cardTitle}>{item.title}</Text>
         <Text style={styles.mapName}>{getMapName(item.mapId)}</Text>
         
         <View style={styles.tags}>
@@ -200,7 +200,7 @@ export default function SearchLineupsScreen({ navigation }) {
       </View>
 
       {/* Results */}
-      <FlatList
+      <MasonryList
         data={filteredLineups}
         renderItem={renderLineupCard}
         keyExtractor={(item) => item.id.toString()}
@@ -303,19 +303,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   grid: {
-    paddingHorizontal: 5,
+    paddingHorizontal: 12,
     paddingVertical: 5,
   },
   lineupCard: {
-    width: '47%',
-    margin: 5,
+    flex: 1,
+    marginBottom: 6,
+    marginHorizontal: 3,
     backgroundColor: '#2a2a2a',
-    borderRadius: 10,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   cardImage: {
     width: '100%',
-    height: 120,
+    aspectRatio: 16 / 9,
     backgroundColor: '#3a3a3a',
   },
   cardInfo: {

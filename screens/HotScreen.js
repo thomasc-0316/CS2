@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { useUpvotes } from '../context/UpvoteContext';
 import LineupCard from '../components/LineupCard';
+import MasonryList from '@react-native-seoul/masonry-list';
 
 export default function HotScreen({ navigation }) {
   const [timeFilter, setTimeFilter] = useState('today'); // 'today', 'week', 'month'
@@ -117,13 +118,12 @@ export default function HotScreen({ navigation }) {
         ))}
       </View>
 
-      <FlatList
+      <MasonryList
         data={hotLineups}
         renderItem={renderLineupCard}
         keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         contentContainerStyle={styles.grid}
-        columnWrapperStyle={styles.row}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6800" />
         }
@@ -188,12 +188,8 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   grid: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingBottom: 10,
-  },
-  row: {
-    justifyContent: 'space-between',
-    paddingHorizontal: 5,
   },
   emptyState: {
     flex: 1,

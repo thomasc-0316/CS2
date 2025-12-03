@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import LineupCard from '../components/LineupCard';
 import { getFilteredLineups } from '../services/lineupService';
 import { MAPS } from '../data/maps';
@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { collection, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
+import MasonryList from '@react-native-seoul/masonry-list';
 
 export default function TacticDetailScreen({ navigation, route }) {
   const tactic = route.params?.tactic;
@@ -126,22 +127,20 @@ export default function TacticDetailScreen({ navigation, route }) {
           <ActivityIndicator color="#FF6800" />
           <Text style={styles.loadingText}>Loading lineups...</Text>
         </View>
+      ) : lineups.length === 0 ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyTitle}>No lineups yet</Text>
+          <Text style={styles.emptySubtitle}>
+            Add lineups to this tactic to see them here.
+          </Text>
+        </View>
       ) : (
-        <FlatList
+        <MasonryList
           data={lineups}
           renderItem={renderLineup}
           keyExtractor={(item) => item.id.toString()}
           numColumns={2}
           contentContainerStyle={styles.listContent}
-          columnWrapperStyle={styles.columnWrapper}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>No lineups yet</Text>
-              <Text style={styles.emptySubtitle}>
-                Add lineups to this tactic to see them here.
-              </Text>
-            </View>
-          }
         />
       )}
     </View>
@@ -200,12 +199,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   listContent: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingBottom: 16,
-  },
-  columnWrapper: {
-    justifyContent: 'space-between',
-    paddingHorizontal: 5,
   },
   empty: {
     alignItems: 'center',
