@@ -188,7 +188,7 @@ export default function EditProfileScreen({ navigation }) {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={22} color="#FF6800" />
+          <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
         
         <Text style={styles.headerTitle}>Edit Profile</Text>
