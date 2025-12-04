@@ -120,7 +120,7 @@ export default function PreviewPostScreen({ route, navigation }) {
       {/* Header with Back and Action buttons */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerButton} onPress={handleGoBack}>
-          <Ionicons name="arrow-back" size={22} color="#FF6800" />
+          <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
         
         <Text style={styles.headerTitle}>Preview</Text>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ImageBackground, ActivityIndicator, Animated } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
@@ -9,6 +10,7 @@ import { useUpvotes } from '../context/UpvoteContext';
 import CreatorDiscovery from '../components/CreatorDiscovery';
 import LineupCard from '../components/LineupCard';
 import HotScreen from './HotScreen';
+import MasonryList from '@react-native-seoul/masonry-list';
 
 export default function HomeScreen({ navigation, route }) {
   const [activeTab, setActiveTab] = useState('explore'); // 'explore' | 'following' | 'hot'
@@ -24,6 +26,7 @@ export default function HomeScreen({ navigation, route }) {
   const [tempFilters, setTempFilters] = useState(followingFilters);
   const [followingLineups, setFollowingLineups] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [followingBannerDismissed, setFollowingBannerDismissed] = useState(false);
   const { getFollowing } = useFollow();
   const { getUpvoteCount } = useUpvotes();
 
@@ -39,6 +42,30 @@ export default function HomeScreen({ navigation, route }) {
       navigation?.setParams?.({ startTab: null });
     }
   }, [route?.params?.startTab]);
+
+  // Load following banner dismissed state
+  useEffect(() => {
+    const loadBannerState = async () => {
+      try {
+        const dismissed = await AsyncStorage.getItem('followingBannerDismissed');
+        if (dismissed === 'true') {
+          setFollowingBannerDismissed(true);
+        }
+      } catch (error) {
+        console.error('Error loading banner state:', error);
+      }
+    };
+    loadBannerState();
+  }, []);
+
+  const dismissFollowingBanner = async () => {
+    try {
+      await AsyncStorage.setItem('followingBannerDismissed', 'true');
+      setFollowingBannerDismissed(true);
+    } catch (error) {
+      console.error('Error saving banner state:', error);
+    }
+  };
 
   // Fetch lineups from followed creators
   useEffect(() => {
@@ -269,49 +296,59 @@ export default function HomeScreen({ navigation, route }) {
     // Show lineups from followed creators as a grid (like Explore)
     return (
       <View style={styles.followingContentContainer}>
-        <View style={styles.followingHeader}>
-          <Ionicons name="people" size={20} color="#FF6800" />
-          <Text style={styles.followingHeaderText}>
-            Lineups from creators you follow
-          </Text>
-        </View>
+        {!followingBannerDismissed && (
+          <TouchableOpacity
+            style={styles.followingHeader}
+            onPress={dismissFollowingBanner}
+            activeOpacity={0.7}
+          >
+            <View style={styles.followingHeaderContent}>
+              <Ionicons name="people" size={20} color="#FF6800" />
+              <Text style={styles.followingHeaderText}>
+                Lineups from creators you follow
+              </Text>
+            </View>
+            <Ionicons name="chevron-up" size={20} color="#888" />
+          </TouchableOpacity>
+        )}
 
-        <View style={styles.sortRow}>
+        <View style={styles.sortAndFilterRow}>
+          <View style={styles.sortButtonsContainer}>
+            <TouchableOpacity
+              style={styles.sortButton}
+              onPress={() => setSortBy('hybrid')}
+            >
+              <Text style={[styles.sortText, sortBy === 'hybrid' && styles.sortTextActive]}>All</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.sortButton}
+              onPress={() => setSortBy('newest')}
+            >
+              <Text style={[styles.sortText, sortBy === 'newest' && styles.sortTextActive]}>Newest</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.sortButton}
+              onPress={() => setSortBy('likes')}
+            >
+              <Text style={[styles.sortText, sortBy === 'likes' && styles.sortTextActive]}>Most Likes</Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
-            style={[styles.sortButton, sortBy === 'hybrid' && styles.sortButtonActive]}
-            onPress={() => setSortBy('hybrid')}
+            style={styles.filterIconButton}
+            onPress={() => {
+              setTempFilters(followingFilters);
+              setFilterVisible(true);
+              Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 250,
+                useNativeDriver: true,
+              }).start();
+            }}
           >
-            <Text style={[styles.sortText, sortBy === 'hybrid' && styles.sortTextActive]}>Default</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sortButton, sortBy === 'newest' && styles.sortButtonActive]}
-            onPress={() => setSortBy('newest')}
-          >
-            <Text style={[styles.sortText, sortBy === 'newest' && styles.sortTextActive]}>Newest</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sortButton, sortBy === 'likes' && styles.sortButtonActive]}
-            onPress={() => setSortBy('likes')}
-          >
-            <Text style={[styles.sortText, sortBy === 'likes' && styles.sortTextActive]}>Most Likes</Text>
+            <Ionicons name="options" size={22} color="#fff" />
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          style={styles.filterToggle}
-          onPress={() => {
-            setTempFilters(followingFilters);
-            setFilterVisible(true);
-            Animated.timing(slideAnim, {
-              toValue: 0,
-              duration: 250,
-              useNativeDriver: true,
-            }).start();
-          }}
-        >
-          <Text style={styles.filterToggleText}>Filters</Text>
-          <Ionicons name="options" size={18} color="#fff" />
-        </TouchableOpacity>
 
         {filterVisible && (
           <View style={styles.filterPortal} pointerEvents="box-none">
@@ -456,7 +493,7 @@ export default function HomeScreen({ navigation, route }) {
         )}
 
         <View style={{ flex: 1 }}>
-          <FlatList
+          <MasonryList
             data={sortedFollowingLineups}
             renderItem={({ item }) => (
               <LineupCard lineup={item} navigation={navigation} />
@@ -464,7 +501,6 @@ export default function HomeScreen({ navigation, route }) {
             keyExtractor={(item) => item.id.toString()}
             numColumns={2}
             contentContainerStyle={styles.lineupGrid}
-            columnWrapperStyle={styles.lineupRow}
             ListEmptyComponent={
               <View style={styles.emptyState}>
                 <Ionicons name="albums-outline" size={60} color="#4a4a4a" />
@@ -877,11 +913,17 @@ const styles = StyleSheet.create({
   followingHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 15,
     paddingVertical: 12,
     backgroundColor: '#2a2a2a',
     borderBottomWidth: 1,
     borderBottomColor: '#3a3a3a',
+  },
+  followingHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   followingHeaderText: {
     fontSize: 15,
@@ -890,41 +932,38 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   lineupGrid: {
-    paddingHorizontal: 5,
+    paddingHorizontal: 12,
     paddingTop: 5,
     paddingBottom: 10,
   },
-  lineupRow: {
-    justifyContent: 'space-between',
-    paddingHorizontal: 5,
-  },
-  sortRow: {
+  sortAndFilterRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 10,
-    paddingHorizontal: 15,
-    paddingTop: 16,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingLeft: 15,
+    paddingRight: 12,
+    paddingTop: 12,
     paddingBottom: 8,
   },
-  sortButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#444',
-    backgroundColor: '#1f1f1f',
+  sortButtonsContainer: {
+    flexDirection: 'row',
+    gap: 20,
+    flex: 1,
   },
-  sortButtonActive: {
-    borderColor: '#FF6800',
-    backgroundColor: '#2a1a10',
+  sortButton: {
+    paddingVertical: 6,
   },
   sortText: {
-    color: '#aaa',
-    fontSize: 13,
+    color: '#666',
+    fontSize: 14,
     fontWeight: '600',
   },
   sortTextActive: {
     color: '#fff',
+  },
+  filterIconButton: {
+    padding: 0,
+    marginLeft: 6,
   },
   filterSection: {
     paddingHorizontal: 15,
@@ -969,23 +1008,6 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#fff',
-  },
-  filterToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#1f1f1f',
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#2a2a2a',
-  },
-  filterToggleText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
   },
   filterPortal: {
     ...StyleSheet.absoluteFillObject,
