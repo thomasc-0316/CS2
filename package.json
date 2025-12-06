@@ -45,5 +45,8 @@
   "bugs": {
     "url": "https://github.com/thomasc-0316/CS2/issues"
   },
-  "homepage": "https://github.com/thomasc-0316/CS2#readme"
+  "homepage": "https://github.com/thomasc-0316/CS2#readme",
+  "devDependencies": {
+    "dotenv": "^17.2.3"
+  }
 }

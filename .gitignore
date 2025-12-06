@@ -3,5 +3,8 @@ node_modules/
 .DS_Store
 node_modules
 scripts/serviceAccountKey.json
+scripts/.env
+.env
+.env.local
 andriod/
 ios/

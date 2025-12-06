@@ -49,7 +49,7 @@ const compressImage = async (uri, quality = 0.8) => {
  * Upload a single image to Firebase Storage
  * @param {string} localUri - Local image URI
  * @param {string} userId - User ID
- * @param {string} imageType - 'stand', 'aim', 'land', or 'thirdPerson'
+ * @param {string} imageType - 'stand', 'aim', 'land', or 'moreDetails'
  * @returns {Promise<string>} - Download URL
  */
 const uploadLineupImage = async (localUri, userId, imageType) => {
@@ -100,12 +100,12 @@ export const createLineupPost = async (postData, currentUser) => {
 
   try {
     // Upload all images
-    const [standImageURL, aimImageURL, landImageURL, thirdPersonImageURL] = await Promise.all([
+    const [standImageURL, aimImageURL, landImageURL, moreDetailsImageURL] = await Promise.all([
       uploadLineupImage(postData.standImage, currentUser.uid, 'stand'),
       uploadLineupImage(postData.aimImage, currentUser.uid, 'aim'),
       uploadLineupImage(postData.landImage, currentUser.uid, 'land'),
-      postData.thirdPersonImage 
-        ? uploadLineupImage(postData.thirdPersonImage, currentUser.uid, 'thirdPerson')
+      postData.moreDetailsImage
+        ? uploadLineupImage(postData.moreDetailsImage, currentUser.uid, 'moreDetails')
         : Promise.resolve(null)
     ]);
 
@@ -129,7 +129,7 @@ export const createLineupPost = async (postData, currentUser) => {
       standImage: standImageURL,
       aimImage: aimImageURL,
       landImage: landImageURL,
-      thirdPersonImage: thirdPersonImageURL,
+      moreDetailsImage: moreDetailsImageURL,
       
       // Creator info
       creatorId: currentUser.uid,
@@ -201,10 +201,10 @@ export const updateLineupPost = async (lineupId, postData, currentUser) => {
     const landImageURL = postData.landImage !== existingData.landImage
       ? await uploadLineupImage(postData.landImage, currentUser.uid, 'land')
       : existingData.landImage;
-      
-    const thirdPersonImageURL = postData.thirdPersonImage && postData.thirdPersonImage !== existingData.thirdPersonImage
-      ? await uploadLineupImage(postData.thirdPersonImage, currentUser.uid, 'thirdPerson')
-      : (postData.thirdPersonImage || null);
+
+    const moreDetailsImageURL = postData.moreDetailsImage && postData.moreDetailsImage !== existingData.moreDetailsImage
+      ? await uploadLineupImage(postData.moreDetailsImage, currentUser.uid, 'moreDetails')
+      : (postData.moreDetailsImage || null);
 
     // Update lineup document
     const updates = {
@@ -217,7 +217,7 @@ export const updateLineupPost = async (lineupId, postData, currentUser) => {
       standImage: standImageURL,
       aimImage: aimImageURL,
       landImage: landImageURL,
-      thirdPersonImage: thirdPersonImageURL,
+      moreDetailsImage: moreDetailsImageURL,
       updatedAt: serverTimestamp()
     };
 

@@ -128,12 +128,12 @@ export default function LineupDetailScreen({ route, navigation }) {
   // Image viewing state
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [showThirdPerson, setShowThirdPerson] = useState(false);
+  const [showMoreDetails, setShowMoreDetails] = useState(false);
 
   const [standImageLoading, setStandImageLoading] = useState(true);
   const [aimImageLoading, setAimImageLoading] = useState(true);
   const [landImageLoading, setLandImageLoading] = useState(true);
-  const [thirdPersonLoading, setThirdPersonLoading] = useState(true);
+  const [moreDetailsImageLoading, setMoreDetailsImageLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
   const refreshCreator = async () => {
     if (!lineup) return;
@@ -182,8 +182,8 @@ export default function LineupDetailScreen({ route, navigation }) {
   const upvoteCount = getUpvoteCount(lineup);
   const favorited = isFavorite(lineup.id);
 
-  // Check if third person image exists
-  const hasThirdPerson = !!lineup.standImageThirdPerson;
+  // Check if more details image exists
+  const hasMoreDetailsImage = !!lineup.moreDetailsImage;
 
   // Prepare images for viewer - handle both local and remote images
   const getImageUri = (imageSource) => {
@@ -369,39 +369,39 @@ export default function LineupDetailScreen({ route, navigation }) {
           </View>
         </TouchableOpacity>
 
-        {/* Show More Details Button (if third person exists) */}
-        {hasThirdPerson && (
+        {/* Show More Details Button (if fourth image exists) */}
+        {hasMoreDetailsImage && (
           <TouchableOpacity
             style={styles.showMoreButton}
-            onPress={() => setShowThirdPerson(!showThirdPerson)}
+            onPress={() => setShowMoreDetails(!showMoreDetails)}
           >
             <Ionicons
-              name={showThirdPerson ? 'chevron-up' : 'chevron-down'}
+              name={showMoreDetails ? 'chevron-up' : 'chevron-down'}
               size={20}
               color="#FF6800"
             />
             <Text style={styles.showMoreText}>
-              {showThirdPerson ? 'Hide' : 'Show'} Third-Person View
+              {showMoreDetails ? 'Hide' : 'Show'} More Details
             </Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Third Person Image (expanded) */}
-      {hasThirdPerson && showThirdPerson && (
-        <View style={styles.thirdPersonContainer}>
-          <Text style={styles.thirdPersonLabel}>Third-Person Perspective:</Text>
+      {/* More Details Image (expanded) */}
+      {hasMoreDetailsImage && showMoreDetails && (
+        <View style={styles.moreDetailsContainer}>
+          <Text style={styles.moreDetailsLabel}>Additional Details:</Text>
           <TouchableOpacity activeOpacity={0.9}>
             <Image
-              source={typeof lineup.standImageThirdPerson === 'string' 
-                ? { uri: lineup.standImageThirdPerson } 
-                : lineup.standImageThirdPerson}
+              source={typeof lineup.moreDetailsImage === 'string'
+                ? { uri: lineup.moreDetailsImage }
+                : lineup.moreDetailsImage}
               style={styles.image}
               contentFit="cover"
-              onLoadStart={() => setThirdPersonLoading(true)}
-              onLoad={() => setThirdPersonLoading(false)}
+              onLoadStart={() => setMoreDetailsImageLoading(true)}
+              onLoad={() => setMoreDetailsImageLoading(false)}
             />
-            {thirdPersonLoading && (
+            {moreDetailsImageLoading && (
               <View style={styles.detailImageLoading}>
                 <ActivityIndicator size="small" color="#666" />
               </View>
@@ -690,11 +690,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 5,
   },
-  thirdPersonContainer: {
+  moreDetailsContainer: {
     marginTop: 15,
     padding: 15,
   },
-  thirdPersonLabel: {
+  moreDetailsLabel: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#aaa',

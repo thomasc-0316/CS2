@@ -1,8 +1,9 @@
 // scripts/uploadLineupsWithImages.js
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const admin = require('firebase-admin');
 const serviceAccount = require('./serviceAccountKey.json');
 const fs = require('fs');
-const path = require('path');
 
 // Initialize Firebase Admin (bypasses all security rules)
 admin.initializeApp({
@@ -13,8 +14,16 @@ admin.initializeApp({
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 
-// IMPORTANT: Your Textbook account UID
-const TEXTBOOK_UID = 'cXXmXsJittW5QQ7ILuYttnMu11e2';
+// Load Textbook account UID from environment variable
+const TEXTBOOK_UID = process.env.TEXTBOOK_UID;
+
+if (!TEXTBOOK_UID) {
+  console.error('❌ ERROR: TEXTBOOK_UID not found in environment variables');
+  console.error('📍 Create a .env file in the scripts folder with:');
+  console.error('   TEXTBOOK_UID=your-textbook-user-uid');
+  console.error('📍 See .env.example for reference');
+  process.exit(1);
+}
 
 // Path to your images folder
 const IMAGES_BASE_PATH = path.join(__dirname, '..', 'assets', 'lineup_images');
@@ -329,7 +338,19 @@ async function migrateLineupsWithImages() {
         `lineups/${lineupId}/land.png`
       );
       uploadedImages++;
-      
+
+      // Upload optional fourth image if it exists
+      let moreDetailsImageURL = null;
+      if (lineup.moreDetailsImage) {
+        console.log('  ⬆️  Uploading more details image...');
+        const moreDetailsImagePath = path.join(IMAGES_BASE_PATH, lineup.moreDetailsImage);
+        moreDetailsImageURL = await uploadImage(
+          moreDetailsImagePath,
+          `lineups/${lineupId}/moreDetails.png`
+        );
+        uploadedImages++;
+      }
+
       // Create Firestore document with real image URLs
       const lineupData = {
         title: lineup.title,
@@ -345,7 +366,8 @@ async function migrateLineupsWithImages() {
         standImage: standImageURL,
         aimImage: aimImageURL,
         landImage: landImageURL,
-        
+        moreDetailsImage: moreDetailsImageURL,
+
         // Creator info (Textbook account)
         creatorId: TEXTBOOK_UID,
         creatorUsername: 'Textbook',
