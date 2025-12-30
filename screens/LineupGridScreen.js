@@ -30,6 +30,12 @@ export default function LineupGridScreen({ navigation, route }) {
   const [selectedSites, setSelectedSites] = useState([]);
   const [selectedNadeTypes, setSelectedNadeTypes] = useState([]);
 
+  // Temporary filter states (for the panel before applying)
+  const [tempSides, setTempSides] = useState([]);
+  const [tempSites, setTempSites] = useState([]);
+  const [tempNadeTypes, setTempNadeTypes] = useState([]);
+  const activeFilterCount = selectedSides.length + selectedSites.length + selectedNadeTypes.length;
+
   // Set custom navigation header
   useEffect(() => {
     navigation.setOptions({
@@ -65,11 +71,6 @@ export default function LineupGridScreen({ navigation, route }) {
       ),
     });
   }, [navigation, searchQuery, activeFilterCount]);
-
-  // Temporary filter states (for the panel before applying)
-  const [tempSides, setTempSides] = useState([]);
-  const [tempSites, setTempSites] = useState([]);
-  const [tempNadeTypes, setTempNadeTypes] = useState([]);
 
   // Fetch lineups from Firestore on mount
   useEffect(() => {
@@ -191,8 +192,6 @@ export default function LineupGridScreen({ navigation, route }) {
       setTempNadeTypes([...tempNadeTypes, type]);
     }
   };
-
-  const activeFilterCount = selectedSides.length + selectedSites.length + selectedNadeTypes.length;
 
   // Show loading spinner on first load
   if (loading) {

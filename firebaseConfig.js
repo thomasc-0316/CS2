@@ -1,14 +1,10 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-import {
-  getAuth,
-  getReactNativePersistence,
-  initializeAuth,
-} from 'firebase/auth';
+// Firebase initialization shared by native + web.
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, initializeAuth } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getStorage } from 'firebase/storage';
 import { getFirestore } from 'firebase/firestore';
+import { Platform } from 'react-native';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -22,17 +18,19 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Auth with React Native persistence
+// Auth: web needs getAuth (for popup/redirect), native uses initializeAuth + AsyncStorage persistence.
 let authInstance;
-try {
+if (Platform.OS === 'web') {
+  authInstance = getAuth(app);
+} else {
+  // Lazy import to avoid bundling react-native auth persistence on web.
+  // eslint-disable-next-line global-require
+  const { getReactNativePersistence } = require('firebase/auth/react-native');
   authInstance = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage),
   });
-} catch (error) {
-  // If Auth was already initialized (hot reload), fall back to the existing instance
-  authInstance = getAuth(app);
 }
 
 // Initialize Storage

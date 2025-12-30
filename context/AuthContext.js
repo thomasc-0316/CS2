@@ -6,7 +6,9 @@ import {
   onAuthStateChanged,
   updateProfile,
   GoogleAuthProvider,
-  signInWithCredential
+  signInWithCredential,
+  signInWithPopup,
+  signInWithRedirect
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
@@ -146,6 +148,46 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Web: login with Google popup (keeps same Firebase flow as native ID token path)
+  const loginWithGooglePopup = async () => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    try {
+      // Debug: ensure web auth/provider are correct instances
+      console.log('auth:', auth);
+      console.log('auth ctor:', auth?.constructor?.name);
+      console.log('provider:', provider);
+      console.log('provider ctor:', provider?.constructor?.name);
+
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      await createUserProfileDocument(user, {
+        email: user.email,
+        displayName: user.displayName || user.email?.split('@')[0],
+        username: user.displayName || user.email?.split('@')[0],
+        profilePicture: user.photoURL || null
+      });
+
+      return user;
+    } catch (error) {
+      // Fallback to redirect in environments where popups are blocked/unsupported.
+      if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/operation-not-supported-in-this-environment') {
+        try {
+          await signInWithRedirect(auth, provider);
+          return null;
+        } catch (redirectError) {
+          console.error('Google redirect login error:', redirectError?.code, redirectError?.message);
+          throw redirectError;
+        }
+      }
+
+      console.error('Google popup login error:', error?.code, error?.message);
+      throw error;
+    }
+  };
+
   // Update user profile in Firestore (and Auth display name) then refresh local state
   const updateUserProfile = async (updates = {}) => {
     if (!auth.currentUser) {
@@ -250,6 +292,7 @@ export const AuthProvider = ({ children }) => {
     signup,
     login,
     loginWithGoogle,
+    loginWithGooglePopup,
     logout,
     loading,
     getUserProfile,

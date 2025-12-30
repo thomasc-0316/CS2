@@ -1,4 +1,6 @@
 node_modules/
+web/node_modules/
+web/.npm-cache/
 .expo/
 .DS_Store
 node_modules
