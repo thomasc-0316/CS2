@@ -1,0 +1,12 @@
+declare module '../../context/*';
+declare module '../../../context/*';
+declare module '../context/*';
+declare module '../../services/*';
+declare module '../services/*';
+declare module '../../../services/*';
+declare module '../../data/*';
+declare module '../data/*';
+declare module '../../../data/*';
+declare module '../../firebaseConfig';
+declare module '../firebaseConfig';
+declare module '../../../firebaseConfig';
