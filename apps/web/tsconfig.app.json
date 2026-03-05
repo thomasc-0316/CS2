@@ -1,0 +1,59 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "types": ["vite/client", "react-native"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "baseUrl": ".",
+    "paths": {
+      "react-native": ["./node_modules/@types/react-native"],
+      "react-native/*": ["./node_modules/@types/react-native/*"],
+      "react-native-web": ["./node_modules/react-native-web"],
+      "@react-native-async-storage/async-storage": ["./src/shims/async-storage"],
+      "expo-image": ["./src/shims/expo-image"],
+      "expo-asset": ["./src/shims/expo-asset"],
+      "expo-image-picker": ["./src/shims/expo-image-picker"],
+      "expo-media-library": ["./src/shims/expo-media-library"],
+      "expo-image-manipulator": ["./src/shims/expo-image-manipulator"],
+      "expo-auth-session/providers/google": ["./src/shims/expo-auth-session-providers-google"],
+      "expo-auth-session": ["./src/shims/expo-auth-session"],
+      "expo-web-browser": ["./src/shims/expo-web-browser"],
+      "@expo/vector-icons": ["./src/shims/expo-vector-icons"],
+      "@react-native-seoul/masonry-list": ["./src/shims/masonry-list"],
+      "react-native-image-viewing": ["./src/shims/react-native-image-viewing"],
+      "expo-modules-core": ["./src/shims/expo-modules-core"],
+      "react-native/Libraries/Animated/NativeAnimatedHelper": ["./src/shims/NativeAnimatedHelper"],
+      "react-native/Libraries/Utilities/codegenNativeComponent": ["./src/shims/codegenNativeComponent"]
+      ,
+      "../../context/*": ["../context/*"],
+      "../../services/*": ["../services/*"],
+      "../../data/*": ["../data/*"],
+      "../../firebaseConfig": ["../firebaseConfig.js"],
+      "@ctx/*": ["/Users/ivan/CS2/context/*.js", "/Users/ivan/CS2/context/*"],
+      "@services/*": ["/Users/ivan/CS2/services/*.js", "/Users/ivan/CS2/services/*"],
+      "@data/*": ["/Users/ivan/CS2/data/*.js", "/Users/ivan/CS2/data/*"]
+    },
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": false,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "noImplicitAny": true
+  },
+  "include": ["src", "../context/**/*.js", "../services/**/*.js", "../data/**/*.js", "../firebaseConfig.js"]
+}

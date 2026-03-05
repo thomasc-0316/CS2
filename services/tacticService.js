@@ -1,6 +1,8 @@
 import {
   addDoc,
   collection,
+  doc,
+  getDoc,
   getDocs,
   orderBy,
   query,
@@ -108,4 +110,16 @@ export const createTactic = async ({
 
   const docRef = await addDoc(tacticsCollection, payload);
   return { id: docRef.id, ...payload };
+};
+
+export const getTacticById = async (tacticId) => {
+  if (!tacticId) return null;
+  try {
+    const docSnap = await getDoc(doc(tacticsCollection, tacticId));
+    if (!docSnap.exists()) return null;
+    return docToTactic(docSnap);
+  } catch (error) {
+    console.error('Failed to fetch tactic by id', error);
+    return null;
+  }
 };

@@ -6,7 +6,10 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "npm run dev:web",
+    "dev:web": "npm --prefix apps/web run dev",
+    "build:web": "npm --prefix apps/web run build",
+    "preview:web": "npm --prefix apps/web run preview"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -47,6 +50,8 @@
   },
   "homepage": "https://github.com/thomasc-0316/CS2#readme",
   "devDependencies": {
-    "dotenv": "^17.2.3"
+    "@types/react": "~19.1.10",
+    "dotenv": "^17.2.3",
+    "typescript": "~5.9.2"
   }
 }
