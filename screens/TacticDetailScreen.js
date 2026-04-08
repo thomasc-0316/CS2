@@ -4,7 +4,7 @@ import LineupCard from '../components/LineupCard';
 import { getFilteredLineups } from '../services/lineupService';
 import { MAPS } from '../data/maps';
 import { useAuth } from '../context/AuthContext';
-import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { collection, getDocs, limit, query, where } from '../services/firestoreClient';
 import { db } from '../firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import MasonryList from '@react-native-seoul/masonry-list';

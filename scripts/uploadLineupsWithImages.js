@@ -1,9 +1,72 @@
 // scripts/uploadLineupsWithImages.js
+//
+// Hardened: requires explicit confirmation before writing to prod, supports
+// `--dry-run`, and refuses to start unless the resolved service-account key
+// path is covered by a .gitignore entry (defense against accidental commits
+// of privileged credentials — H5 in FULL_QA_AUDIT.md).
 const path = require('path');
+const readline = require('readline');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 const admin = require('firebase-admin');
-const serviceAccount = require('./serviceAccountKey.json');
 const fs = require('fs');
+
+const DRY_RUN = process.argv.includes('--dry-run');
+
+const serviceAccountKeyPath = path.resolve(
+  __dirname,
+  process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH || 'serviceAccountKey.json',
+);
+
+if (!fs.existsSync(serviceAccountKeyPath)) {
+  console.error('❌ ERROR: Firebase service account key file not found');
+  console.error(`📍 Looked at: ${serviceAccountKeyPath}`);
+  console.error('📍 Set FIREBASE_SERVICE_ACCOUNT_KEY_PATH in scripts/.env to the key JSON path');
+  process.exit(1);
+}
+
+// Preflight: confirm the service account file is covered by .gitignore. If
+// the key path lives inside the repo and isn't ignored we refuse to run so
+// nobody accidentally commits credentials.
+function ensureGitignored(absKeyPath) {
+  const repoRoot = path.resolve(__dirname, '..');
+  if (!absKeyPath.startsWith(repoRoot)) return; // Outside repo — safe.
+  const gitignorePath = path.join(repoRoot, '.gitignore');
+  if (!fs.existsSync(gitignorePath)) {
+    console.error('❌ ERROR: .gitignore not found at repo root.');
+    process.exit(1);
+  }
+  const gitignore = fs.readFileSync(gitignorePath, 'utf8');
+  const relative = path.relative(repoRoot, absKeyPath);
+  const looksIgnored =
+    gitignore.includes('serviceAccountKey.json') ||
+    gitignore.split(/\r?\n/).some((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) return false;
+      return relative === trimmed || relative.endsWith(`/${trimmed}`) || trimmed.endsWith('*.json');
+    });
+  if (!looksIgnored) {
+    console.error('❌ REFUSING TO RUN: service account key is not gitignored.');
+    console.error(`   key: ${relative}`);
+    console.error('   Add `serviceAccountKey.json` (or your custom path) to .gitignore first.');
+    process.exit(1);
+  }
+}
+ensureGitignored(serviceAccountKeyPath);
+
+const promptYesNo = (question) =>
+  new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question(`${question} (yes/no) `, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === 'yes');
+    });
+  });
+
+// eslint-disable-next-line import/no-dynamic-require, global-require
+const serviceAccount = require(serviceAccountKeyPath);
 
 // Initialize Firebase Admin (bypasses all security rules)
 admin.initializeApp({
@@ -21,6 +84,7 @@ if (!TEXTBOOK_UID) {
   console.error('❌ ERROR: TEXTBOOK_UID not found in environment variables');
   console.error('📍 Create a .env file in the scripts folder with:');
   console.error('   TEXTBOOK_UID=your-textbook-user-uid');
+  console.error('   FIREBASE_SERVICE_ACCOUNT_KEY_PATH=./serviceAccountKey.json');
   console.error('📍 See .env.example for reference');
   process.exit(1);
 }
@@ -287,17 +351,29 @@ async function uploadImage(filePath, storagePath) {
 // Main migration function
 async function migrateLineupsWithImages() {
   console.log('🚀 Starting lineup migration with image uploads...\n');
-  
+  console.log(`   Mode: ${DRY_RUN ? 'DRY RUN (no writes)' : 'LIVE (will write to Firestore + Storage)'}\n`);
+
   // Check if images folder exists
   if (!fs.existsSync(IMAGES_BASE_PATH)) {
     console.error(`❌ ERROR: Images folder not found at: ${IMAGES_BASE_PATH}`);
     console.error('📍 Make sure your images are in: assets/lineup_images/\n');
     process.exit(1);
   }
-  
+
   console.log(`📊 Total lineups to migrate: ${LINEUPS.length}`);
   console.log(`👤 Creator UID: ${TEXTBOOK_UID}`);
   console.log(`📁 Images folder: ${IMAGES_BASE_PATH}\n`);
+
+  if (!DRY_RUN) {
+    const confirmed = await promptYesNo(
+      `⚠️  About to upload ${LINEUPS.length * 3}+ images to Firebase Storage and write ${LINEUPS.length} lineup docs. Proceed?`,
+    );
+    if (!confirmed) {
+      console.log('Aborted.');
+      process.exit(0);
+    }
+  }
+
   console.log('This will take 5-10 minutes (uploading images)...\n');
   
   let successCount = 0;
@@ -310,33 +386,38 @@ async function migrateLineupsWithImages() {
     
     try {
       console.log(`\n[${i + 1}/${LINEUPS.length}] Processing: ${lineup.title}`);
-      
+
       // Generate lineup ID
       const lineupId = `lineup_${Date.now()}_${i}`;
-      
-      // Upload images to Firebase Storage
+
+      // Verify all required images exist before any uploads (cheap preflight)
+      ['standImage', 'aimImage', 'landImage'].forEach((slot) => {
+        const p = path.join(IMAGES_BASE_PATH, lineup[slot]);
+        if (!fs.existsSync(p)) {
+          throw Object.assign(new Error(`Missing required image: ${p}`), { code: 'ENOENT' });
+        }
+      });
+
+      // Upload images to Firebase Storage (skipped in dry-run mode)
       console.log('  ⬆️  Uploading stand image...');
       const standImagePath = path.join(IMAGES_BASE_PATH, lineup.standImage);
-      const standImageURL = await uploadImage(
-        standImagePath,
-        `lineups/${lineupId}/stand.png`
-      );
+      const standImageURL = DRY_RUN
+        ? `dry-run://lineups/${lineupId}/stand.png`
+        : await uploadImage(standImagePath, `lineups/${lineupId}/stand.png`);
       uploadedImages++;
 
       console.log('  ⬆️  Uploading aim image...');
       const aimImagePath = path.join(IMAGES_BASE_PATH, lineup.aimImage);
-      const aimImageURL = await uploadImage(
-        aimImagePath,
-        `lineups/${lineupId}/aim.png`
-      );
+      const aimImageURL = DRY_RUN
+        ? `dry-run://lineups/${lineupId}/aim.png`
+        : await uploadImage(aimImagePath, `lineups/${lineupId}/aim.png`);
       uploadedImages++;
 
       console.log('  ⬆️  Uploading land image...');
       const landImagePath = path.join(IMAGES_BASE_PATH, lineup.landImage);
-      const landImageURL = await uploadImage(
-        landImagePath,
-        `lineups/${lineupId}/land.png`
-      );
+      const landImageURL = DRY_RUN
+        ? `dry-run://lineups/${lineupId}/land.png`
+        : await uploadImage(landImagePath, `lineups/${lineupId}/land.png`);
       uploadedImages++;
 
       // Upload optional fourth image if it exists
@@ -344,10 +425,9 @@ async function migrateLineupsWithImages() {
       if (lineup.moreDetailsImage) {
         console.log('  ⬆️  Uploading more details image...');
         const moreDetailsImagePath = path.join(IMAGES_BASE_PATH, lineup.moreDetailsImage);
-        moreDetailsImageURL = await uploadImage(
-          moreDetailsImagePath,
-          `lineups/${lineupId}/moreDetails.png`
-        );
+        moreDetailsImageURL = DRY_RUN
+          ? `dry-run://lineups/${lineupId}/moreDetails.png`
+          : await uploadImage(moreDetailsImagePath, `lineups/${lineupId}/moreDetails.png`);
         uploadedImages++;
       }
 
@@ -388,13 +468,16 @@ async function migrateLineupsWithImages() {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
-      // Save to Firestore
-      console.log('  💾 Saving to Firestore...');
-      const docRef = await db.collection('lineups').add(lineupData);
-      
-      successCount++;
-      console.log(`  ✅ Success! (Doc ID: ${docRef.id})`);
-      console.log(`  📊 Progress: ${uploadedImages}/${totalImages} images uploaded`);
+      if (DRY_RUN) {
+        console.log(`  🟡 [dry-run] would save lineup "${lineup.title}" with ${uploadedImages}/${totalImages} images`);
+        successCount++;
+      } else {
+        console.log('  💾 Saving to Firestore...');
+        const docRef = await db.collection('lineups').add(lineupData);
+        successCount++;
+        console.log(`  ✅ Success! (Doc ID: ${docRef.id})`);
+        console.log(`  📊 Progress: ${uploadedImages}/${totalImages} images uploaded`);
+      }
       
     } catch (error) {
       errorCount++;

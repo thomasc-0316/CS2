@@ -89,7 +89,8 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['react-native-web', ...sharedDeps],
+    noDiscovery: true,
+    include: ['react', 'react-dom', 'react-native-web'],
     esbuildOptions: {
       loader: {
         '.js': 'jsx',
@@ -115,6 +116,5 @@ export default defineConfig({
         ),
       },
     },
-    entries: sharedDeps,
   },
 });

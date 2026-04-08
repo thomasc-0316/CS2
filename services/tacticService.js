@@ -8,7 +8,7 @@ import {
   query,
   serverTimestamp,
   where,
-} from 'firebase/firestore';
+} from './firestoreClient';
 import { db } from '../firebaseConfig';
 
 const tacticsCollection = collection(db, 'tactics');

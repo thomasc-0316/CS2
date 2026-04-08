@@ -3,14 +3,46 @@ service firebase.storage {
   match /b/{bucket}/o {
     // Profile pictures named {uid}-timestamp.jpg
     match /profilePictures/{fileName} {
-      allow read: if true;
+      allow read: if request.auth != null;
       allow write: if request.auth != null
-        && fileName.matches('^' + request.auth.uid + '-.*$');
+        && fileName.matches('^' + request.auth.uid + '-.*$')
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
 
-    // Default deny for other paths unless authenticated
+    // Public lineup images — anyone signed in may read; only the owner may write.
+    // Lineup images are inherently shared content for this app, so the read
+    // surface intentionally mirrors the social-feed model. Anything that
+    // should NEVER be shared (drafts, work-in-progress) must be written under
+    // /lineups/{userId}/private/{fileName} below.
+    match /lineups/{userId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Private/draft lineup uploads — owner only.
+    match /lineups/{userId}/private/{fileName} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Public map assets — readable by signed-in users only (defense in depth)
+    // and writable only by admins via service account (rules deny by default).
+    match /mapBackground/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    match /mapIcons/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Default deny for other paths
     match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }

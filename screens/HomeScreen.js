@@ -1,16 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ImageBackground, ActivityIndicator, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs } from '../services/firestoreClient';
 import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
 import { useFollow } from '../context/FollowContext';
 import { useUpvotes } from '../context/UpvoteContext';
 import CreatorDiscovery from '../components/CreatorDiscovery';
 import LineupCard from '../components/LineupCard';
+import FilterPanel from '../components/FilterPanel';
 import HotScreen from './HotScreen';
 import MasonryList from '@react-native-seoul/masonry-list';
+import { useRenderCount } from '../hooks/useRenderCount';
+import { useScreenPerf } from '../hooks/useScreenPerf';
+import { fetchDeduped, readMemoryCache, writeMemoryCache } from '../services/dataCache';
+import { toEpochMs } from '../services/timeUtils';
 
 export default function HomeScreen({ navigation, route }) {
   const [activeTab, setActiveTab] = useState('explore'); // 'explore' | 'following' | 'hot'
@@ -29,11 +34,23 @@ export default function HomeScreen({ navigation, route }) {
   const [followingBannerDismissed, setFollowingBannerDismissed] = useState(false);
   const { getFollowing } = useFollow();
   const { getUpvoteCount } = useUpvotes();
+  useRenderCount('HomeScreen');
 
   const followingUsers = getFollowing();
   const followingUserIds = followingUsers.map(user => user.id);
   const followingPlayerIds = followingUsers.map(user => user.playerID).filter(Boolean);
+  const followingUserKey = followingUserIds.join('|');
+  const followingPlayerKey = followingPlayerIds.join('|');
+  const followingCacheKey = `home:following:${followingUserKey}:${followingPlayerKey}`;
   const isFollowingAnyone = followingUserIds.length > 0;
+  const homeDataReady = activeTab !== 'following' || !loading;
+
+  useScreenPerf({
+    screenName: 'HomeScreen',
+    transitionName: 'app_launch_to_home',
+    hasFirstContent: true,
+    isDataReady: homeDataReady,
+  });
 
   useEffect(() => {
     const desiredTab = route?.params?.startTab;
@@ -76,64 +93,77 @@ export default function HomeScreen({ navigation, route }) {
         return;
       }
 
+      const ttlMs = 45 * 1000;
+      const cached = readMemoryCache(followingCacheKey);
+      if (cached.exists) {
+        setFollowingLineups(cached.value);
+        setLoading(false);
+        if (!cached.isExpired) {
+          return;
+        }
+      }
+
       try {
-        setLoading(true);
+        setLoading(!cached.exists);
 
-        // Firebase has a limit of 10 items per 'in' query, so we need to batch
-        const batches = [];
-        for (let i = 0; i < followingUserIds.length; i += 10) {
-          const batch = followingUserIds.slice(i, i + 10);
-          batches.push(batch);
-        }
-
-        const allLineupsMap = new Map();
-        for (const batch of batches) {
-          const q = query(
-            collection(db, 'lineups'),
-            where('creatorId', 'in', batch),
-            where('isPublic', '==', true),
-            orderBy('uploadedAt', 'desc')
-          );
-
-          const snapshot = await getDocs(q);
-          const lineups = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          lineups.forEach((l) => allLineupsMap.set(l.id, l));
-        }
-
-        // Fallback queries by playerID if provided
-        if (followingPlayerIds.length) {
-          for (let i = 0; i < followingPlayerIds.length; i += 10) {
-            const batch = followingPlayerIds.slice(i, i + 10);
-            try {
-              const q = query(
-                collection(db, 'lineups'),
-                where('creatorPlayerId', 'in', batch),
-                where('isPublic', '==', true)
-              );
-              const snapshot = await getDocs(q);
-              const lineups = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-              }));
-              lineups.forEach((l) => allLineupsMap.set(l.id, l));
-            } catch (err) {
-              console.error('Error fetching by playerID batch:', err);
-            }
+        // C7 fix: combine the creatorId and creatorPlayerId batches into a
+        // single Promise.allSettled so they run in one wave instead of two
+        // sequential waves, and so a failure in one batch never poisons the
+        // whole feed. Each batch is hard-capped to 10 ids (Firestore `in`
+        // query limit).
+        const FIRESTORE_IN_LIMIT = 10;
+        const chunk = (arr) => {
+          const out = [];
+          for (let i = 0; i < arr.length; i += FIRESTORE_IN_LIMIT) {
+            out.push(arr.slice(i, i + FIRESTORE_IN_LIMIT));
           }
-        }
+          return out;
+        };
+        const creatorBatches = chunk(followingUserIds);
+        const playerBatches = chunk(followingPlayerIds);
 
-        // Sort all lineups by uploadedAt
-        const allLineups = Array.from(allLineupsMap.values());
-        allLineups.sort((a, b) => {
-          const aDate = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(a.uploadedAt);
-          const bDate = b.uploadedAt?.toDate ? b.uploadedAt.toDate() : new Date(b.uploadedAt);
-          return bDate - aDate;
+        const allLineups = await fetchDeduped(followingCacheKey, async () => {
+          const allLineupsMap = new Map();
+          const queries = [
+            ...creatorBatches.map((batch) =>
+              getDocs(
+                query(
+                  collection(db, 'lineups'),
+                  where('creatorId', 'in', batch),
+                  where('isPublic', '==', true),
+                  orderBy('uploadedAt', 'desc'),
+                ),
+              ),
+            ),
+            ...playerBatches.map((batch) =>
+              getDocs(
+                query(
+                  collection(db, 'lineups'),
+                  where('creatorPlayerId', 'in', batch),
+                  where('isPublic', '==', true),
+                ),
+              ),
+            ),
+          ];
+
+          const settled = await Promise.allSettled(queries);
+          settled.forEach((result) => {
+            if (result.status !== 'fulfilled' || !result.value) return;
+            result.value.docs.forEach((docSnap) => {
+              const data = { id: docSnap.id, ...docSnap.data() };
+              allLineupsMap.set(data.id, data);
+            });
+          });
+
+          const merged = Array.from(allLineupsMap.values());
+          merged.sort(
+            (left, right) => toEpochMs(right.uploadedAt) - toEpochMs(left.uploadedAt),
+          );
+          return merged;
         });
 
         setFollowingLineups(allLineups);
+        writeMemoryCache(followingCacheKey, allLineups, ttlMs);
       } catch (error) {
         console.error('Error fetching following lineups:', error);
         if (error.code === 'failed-precondition') {
@@ -147,7 +177,28 @@ export default function HomeScreen({ navigation, route }) {
     if (activeTab === 'following') {
       fetchFollowingLineups();
     }
-  }, [activeTab, followingUserIds.length]);
+  }, [activeTab, followingCacheKey, followingUserKey, followingPlayerKey]);
+
+  // Stable callbacks for the extracted FilterPanel — they reference state via
+  // closures over the latest tempFilters/setters but never re-create on
+  // unrelated renders, which (combined with FilterPanel being React.memo'd)
+  // stops the panel from re-rendering when only feed data changes.
+  const closeFilterPanel = useCallback(() => {
+    Animated.timing(slideAnim, {
+      toValue: 400,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => setFilterVisible(false));
+  }, [slideAnim]);
+
+  const applyFilterPanel = useCallback(() => {
+    setFollowingFilters(tempFilters);
+    closeFilterPanel();
+  }, [tempFilters, closeFilterPanel]);
+
+  const resetFilterPanel = useCallback(() => {
+    setTempFilters({ map: 'all', type: 'all', side: 'all' });
+  }, []);
 
   // Filters for following feed
   const availableMaps = useMemo(
@@ -192,23 +243,23 @@ export default function HomeScreen({ navigation, route }) {
     const alpha = 0.8;
 
     items.sort((a, bLineup) => {
-      const aDate = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(a.uploadedAt);
-      const bDate = bLineup.uploadedAt?.toDate ? bLineup.uploadedAt.toDate() : new Date(bLineup.uploadedAt);
+      const aTime = toEpochMs(a.uploadedAt);
+      const bTime = toEpochMs(bLineup.uploadedAt);
       const aVotes = getUpvoteCount(a) || 0;
       const bVotes = getUpvoteCount(bLineup) || 0;
 
       if (sortBy === 'likes') {
-        if (bVotes === aVotes) return bDate - aDate;
+        if (bVotes === aVotes) return bTime - aTime;
         return bVotes - aVotes;
       }
 
       if (sortBy === 'newest') {
-        return bDate - aDate;
+        return bTime - aTime;
       }
 
       // Default: score-based hybrid
-      const aAgeHours = Math.max(0, (now - aDate.getTime()) / 3600000);
-      const bAgeHours = Math.max(0, (now - bDate.getTime()) / 3600000);
+      const aAgeHours = Math.max(0, (now - aTime) / 3600000);
+      const bAgeHours = Math.max(0, (now - bTime) / 3600000);
       const aScore = (aVotes + b) / Math.pow(aAgeHours + c, alpha);
       const bScore = (bVotes + b) / Math.pow(bAgeHours + c, alpha);
       return bScore - aScore;
@@ -350,147 +401,18 @@ export default function HomeScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
 
-        {filterVisible && (
-          <View style={styles.filterPortal} pointerEvents="box-none">
-            <TouchableOpacity
-              style={styles.overlay}
-              activeOpacity={1}
-              onPress={() => {
-                Animated.timing(slideAnim, {
-                  toValue: 400,
-                  duration: 250,
-                  useNativeDriver: true,
-                }).start(() => setFilterVisible(false));
-              }}
-            />
-            <Animated.View
-              style={[
-                styles.filterPanel,
-                { transform: [{ translateY: slideAnim }] },
-              ]}
-            >
-              <View style={styles.filterHeaderRow}>
-                <Text style={styles.filterPanelTitle}>Filters</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    Animated.timing(slideAnim, {
-                      toValue: 400,
-                      duration: 250,
-                      useNativeDriver: true,
-                    }).start(() => setFilterVisible(false));
-                  }}
-                >
-                  <Ionicons name="close" size={22} color="#fff" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.filterRow}>
-                <Text style={styles.filterLabel}>Map</Text>
-                <View style={styles.chipRow}>
-                  {availableMaps.map((id) => (
-                    <TouchableOpacity
-                      key={id}
-                      style={[
-                        styles.chip,
-                        tempFilters.map === id && styles.chipActive,
-                      ]}
-                      onPress={() =>
-                        setTempFilters((prev) => ({ ...prev, map: id }))
-                      }
-                    >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          tempFilters.map === id && styles.chipTextActive,
-                        ]}
-                      >
-                        {id === 'all'
-                          ? 'All'
-                          : MAPS.find((m) => m.id === id)?.name || id}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.filterRow}>
-                <Text style={styles.filterLabel}>Type</Text>
-                <View style={styles.chipRow}>
-                  {availableTypes.map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.chip,
-                        tempFilters.type === type && styles.chipActive,
-                      ]}
-                      onPress={() =>
-                        setTempFilters((prev) => ({ ...prev, type }))
-                      }
-                    >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          tempFilters.type === type && styles.chipTextActive,
-                        ]}
-                      >
-                        {type === 'all' ? 'All' : type}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.filterRow}>
-                <Text style={styles.filterLabel}>Side</Text>
-                <View style={styles.chipRow}>
-                  {availableSides.map((side) => (
-                    <TouchableOpacity
-                      key={side}
-                      style={[
-                        styles.chip,
-                        tempFilters.side === side && styles.chipActive,
-                      ]}
-                      onPress={() =>
-                        setTempFilters((prev) => ({ ...prev, side }))
-                      }
-                    >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          tempFilters.side === side && styles.chipTextActive,
-                        ]}
-                      >
-                        {side === 'all' ? 'All' : side.toUpperCase()}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.filterActions}>
-                <TouchableOpacity
-                  style={styles.clearButton}
-                  onPress={() => setTempFilters({ map: 'all', type: 'all', side: 'all' })}
-                >
-                  <Text style={styles.clearButtonText}>Reset</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.applyButton}
-                  onPress={() => {
-                    setFollowingFilters(tempFilters);
-                    Animated.timing(slideAnim, {
-                      toValue: 400,
-                      duration: 250,
-                      useNativeDriver: true,
-                    }).start(() => setFilterVisible(false));
-                  }}
-                >
-                  <Text style={styles.applyButtonText}>Apply</Text>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-          </View>
-        )}
+        <FilterPanel
+          visible={filterVisible}
+          slideAnim={slideAnim}
+          tempFilters={tempFilters}
+          setTempFilters={setTempFilters}
+          availableMaps={availableMaps}
+          availableTypes={availableTypes}
+          availableSides={availableSides}
+          onClose={closeFilterPanel}
+          onApply={applyFilterPanel}
+          onReset={resetFilterPanel}
+        />
 
         <View style={{ flex: 1 }}>
           <MasonryList
@@ -512,147 +434,6 @@ export default function HomeScreen({ navigation, route }) {
             }
           />
 
-          {filterVisible && (
-            <View style={styles.filterPortal} pointerEvents="box-none">
-              <TouchableOpacity
-                style={styles.overlay}
-                activeOpacity={1}
-                onPress={() => {
-                  Animated.timing(slideAnim, {
-                    toValue: 400,
-                    duration: 250,
-                    useNativeDriver: true,
-                  }).start(() => setFilterVisible(false));
-                }}
-              />
-              <Animated.View
-                style={[
-                  styles.filterPanel,
-                  { transform: [{ translateY: slideAnim }] },
-                ]}
-              >
-                <View style={styles.filterHeaderRow}>
-                  <Text style={styles.filterPanelTitle}>Filters</Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      Animated.timing(slideAnim, {
-                        toValue: 400,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => setFilterVisible(false));
-                    }}
-                  >
-                    <Ionicons name="close" size={22} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.filterRow}>
-                  <Text style={styles.filterLabel}>Map</Text>
-                  <View style={styles.chipRow}>
-                    {availableMaps.map((id) => (
-                      <TouchableOpacity
-                        key={id}
-                        style={[
-                          styles.chip,
-                          tempFilters.map === id && styles.chipActive,
-                        ]}
-                        onPress={() =>
-                          setTempFilters((prev) => ({ ...prev, map: id }))
-                        }
-                      >
-                        <Text
-                          style={[
-                            styles.chipText,
-                            tempFilters.map === id && styles.chipTextActive,
-                          ]}
-                        >
-                          {id === 'all'
-                            ? 'All'
-                            : MAPS.find((m) => m.id === id)?.name || id}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.filterRow}>
-                  <Text style={styles.filterLabel}>Type</Text>
-                  <View style={styles.chipRow}>
-                    {availableTypes.map((type) => (
-                      <TouchableOpacity
-                        key={type}
-                        style={[
-                          styles.chip,
-                          tempFilters.type === type && styles.chipActive,
-                        ]}
-                        onPress={() =>
-                          setTempFilters((prev) => ({ ...prev, type }))
-                        }
-                      >
-                        <Text
-                          style={[
-                            styles.chipText,
-                            tempFilters.type === type && styles.chipTextActive,
-                          ]}
-                        >
-                          {type === 'all' ? 'All' : type}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.filterRow}>
-                  <Text style={styles.filterLabel}>Side</Text>
-                  <View style={styles.chipRow}>
-                    {availableSides.map((side) => (
-                      <TouchableOpacity
-                        key={side}
-                        style={[
-                          styles.chip,
-                          tempFilters.side === side && styles.chipActive,
-                        ]}
-                        onPress={() =>
-                          setTempFilters((prev) => ({ ...prev, side }))
-                        }
-                      >
-                        <Text
-                          style={[
-                            styles.chipText,
-                            tempFilters.side === side && styles.chipTextActive,
-                          ]}
-                        >
-                          {side === 'all' ? 'All' : side.toUpperCase()}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.filterActions}>
-                  <TouchableOpacity
-                    style={styles.clearButton}
-                    onPress={() => setTempFilters({ map: 'all', type: 'all', side: 'all' })}
-                  >
-                    <Text style={styles.clearButtonText}>Reset</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.applyButton}
-                    onPress={() => {
-                      setFollowingFilters(tempFilters);
-                      Animated.timing(slideAnim, {
-                        toValue: 400,
-                        duration: 250,
-                        useNativeDriver: true,
-                      }).start(() => setFilterVisible(false));
-                    }}
-                  >
-                    <Text style={styles.applyButtonText}>Apply</Text>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-            </View>
-          )}
         </View>
       </View>
     );

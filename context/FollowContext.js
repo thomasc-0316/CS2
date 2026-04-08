@@ -1,14 +1,13 @@
-import React, { createContext, useState, useEffect, useContext, useRef, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   collection,
   deleteDoc,
   doc,
   getDocs,
-  onSnapshot,
   serverTimestamp,
   setDoc,
-} from 'firebase/firestore';
+} from '../services/firestoreClient';
 import { db } from '../firebaseConfig';
 import { useAuth } from './AuthContext';
 
@@ -19,30 +18,32 @@ export const FollowProvider = ({ children }) => {
   // Structure: { userId: { username, profilePicture, playerID } }
   const [following, setFollowing] = useState({});
   const [followers, setFollowers] = useState({});
-  const followersUnsubscribeRef = useRef(null);
+  // Generation token: every time the active user changes we bump this so
+  // earlier in-flight loads/refreshes that resolve later are dropped on the
+  // floor instead of overwriting the new user's data. Combined with
+  // isMountedRef this fixes the H8 race where logging out + back in mid-fetch
+  // could leave a stale follower set on screen.
+  const generationRef = useRef(0);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const storageKey = (base) => {
     return currentUser?.uid ? `${base}_${currentUser.uid}` : base;
   };
 
-  // Load data from storage when auth user changes
-  useEffect(() => {
-    loadFollowData();
-    startFollowersListener();
-    return () => {
-      if (followersUnsubscribeRef.current) {
-        followersUnsubscribeRef.current();
-        followersUnsubscribeRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.uid]);
-
-  const loadFollowData = async () => {
+  const loadFollowData = async (gen) => {
     try {
       if (!currentUser?.uid) {
-        setFollowing({});
-        setFollowers({});
+        if (isMountedRef.current && gen === generationRef.current) {
+          setFollowing({});
+          setFollowers({});
+        }
         return;
       }
       const savedFollowing =
@@ -51,6 +52,8 @@ export const FollowProvider = ({ children }) => {
       const savedFollowers =
         (await AsyncStorage.getItem(storageKey('followers'))) ||
         (await AsyncStorage.getItem('followers')); // legacy key
+
+      if (!isMountedRef.current || gen !== generationRef.current) return;
 
       if (savedFollowing) {
         setFollowing(JSON.parse(savedFollowing));
@@ -79,39 +82,43 @@ export const FollowProvider = ({ children }) => {
     }
   };
 
-  // Keep current user's followers list in sync with Firestore
-  const startFollowersListener = () => {
+  const refreshFollowers = useCallback(async () => {
+    const gen = generationRef.current;
     if (!currentUser?.uid) {
-      setFollowers({});
+      if (isMountedRef.current && gen === generationRef.current) {
+        setFollowers({});
+      }
       return;
     }
-
-    if (followersUnsubscribeRef.current) {
-      followersUnsubscribeRef.current();
-      followersUnsubscribeRef.current = null;
+    try {
+      const snapshot = await getDocs(collection(db, 'users', currentUser.uid, 'followers'));
+      if (!isMountedRef.current || gen !== generationRef.current) return;
+      const nextFollowers = {};
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() || {};
+        nextFollowers[docSnap.id] = {
+          username: data.username || 'Player',
+          profilePicture: data.profilePicture || null,
+          playerID: data.playerID || null,
+        };
+      });
+      setFollowers(nextFollowers);
+      saveFollowers(nextFollowers);
+    } catch (error) {
+      console.error('Failed to refresh followers', error);
     }
+  }, [currentUser?.uid]);
 
-    const followersRef = collection(db, 'users', currentUser.uid, 'followers');
-    followersUnsubscribeRef.current = onSnapshot(
-      followersRef,
-      (snapshot) => {
-        const nextFollowers = {};
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data() || {};
-          nextFollowers[docSnap.id] = {
-            username: data.username || 'Player',
-            profilePicture: data.profilePicture || null,
-            playerID: data.playerID || null,
-          };
-        });
-        setFollowers(nextFollowers);
-        saveFollowers(nextFollowers);
-      },
-      (error) => {
-        console.error('Failed to listen to followers', error);
-      }
-    );
-  };
+  // Bump the generation token whenever the active user changes, then load
+  // local state and refresh from Firestore. Earlier loads that resolve after
+  // this point are dropped via the gen check above.
+  useEffect(() => {
+    generationRef.current += 1;
+    const gen = generationRef.current;
+    loadFollowData(gen);
+    refreshFollowers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.uid]);
 
   // Note: Follower counts are automatically updated by Cloud Functions
   // when follower documents are added/removed in the subcollection
@@ -125,7 +132,7 @@ export const FollowProvider = ({ children }) => {
         username:
           followerProfile.username ||
           currentUser.displayName ||
-          currentUser.email ||
+          currentUser.email?.split('@')[0] ||
           'Player',
         profilePicture:
           followerProfile.profilePicture ||
@@ -234,29 +241,6 @@ export const FollowProvider = ({ children }) => {
     // Counts are tracked on user documents; return 0 to avoid local double-counting overlays.
     return 0;
   };
-
-  const refreshFollowers = useCallback(async () => {
-    if (!currentUser?.uid) {
-      setFollowers({});
-      return;
-    }
-    try {
-      const snapshot = await getDocs(collection(db, 'users', currentUser.uid, 'followers'));
-      const nextFollowers = {};
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data() || {};
-        nextFollowers[docSnap.id] = {
-          username: data.username || 'Player',
-          profilePicture: data.profilePicture || null,
-          playerID: data.playerID || null,
-        };
-      });
-      setFollowers(nextFollowers);
-      saveFollowers(nextFollowers);
-    } catch (error) {
-      console.error('Failed to refresh followers', error);
-    }
-  }, [currentUser?.uid]);
 
   return (
     <FollowContext.Provider value={{

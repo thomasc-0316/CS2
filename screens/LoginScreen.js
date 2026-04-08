@@ -18,9 +18,15 @@ import { useAuth } from '../context/AuthContext';
 WebBrowser.maybeCompleteAuthSession();
 
 // --- CONFIGURATION ---
-const GOOGLE_WEB_CLIENT_ID = '563685919534-a19qr9hubus44sme0aqhq7hoc6rejica.apps.googleusercontent.com';
-const GOOGLE_IOS_CLIENT_ID = '563685919534-2fg45eppv095rgqk7jkuap0dgk27ojh2.apps.googleusercontent.com';
-const GOOGLE_ANDROID_CLIENT_ID = "563685919534-oc16fkrv6d5uacpjp9uvop0r3oecf27n.apps.googleusercontent.com";
+const GOOGLE_WEB_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+  '563685919534-a19qr9hubus44sme0aqhq7hoc6rejica.apps.googleusercontent.com';
+const GOOGLE_IOS_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
+  '563685919534-2fg45eppv095rgqk7jkuap0dgk27ojh2.apps.googleusercontent.com';
+const GOOGLE_ANDROID_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+  "563685919534-oc16fkrv6d5uacpjp9uvop0r3oecf27n.apps.googleusercontent.com";
 
 export const googleClientIds = {
   expo: GOOGLE_WEB_CLIENT_ID,

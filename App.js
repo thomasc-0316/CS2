@@ -12,6 +12,7 @@ import { CommentsProvider } from './context/CommentsContext';
 import { FollowProvider } from './context/FollowContext';
 import { TacticsProvider } from './context/TacticsContext';
 import { TacticLibraryProvider } from './context/TacticLibraryContext';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function AppContent() {
   const { currentUser, loading } = useAuth();
@@ -59,8 +60,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

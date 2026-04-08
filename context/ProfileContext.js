@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from '../services/firestoreClient';
 import { useAuth } from './AuthContext';
 import { db } from '../firebaseConfig';
 
@@ -91,7 +91,6 @@ export const ProfileProvider = ({ children }) => {
         docRef,
         {
           id: user.uid,
-          email: user.email || '',
           username: newProfile.username,
           usernameLower: newProfile.username.toLowerCase(),
           playerID: newProfile.playerID,

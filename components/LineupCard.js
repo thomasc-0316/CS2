@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { memo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { getUserById } from '../data/users';
+import { useRenderCount } from '../hooks/useRenderCount';
 
-export default function LineupCard({ lineup, navigation, rankBadge }) {
+function LineupCard({ lineup, navigation, rankBadge }) {
   const [imageLoading, setImageLoading] = useState(true);
+  useRenderCount('LineupCard');
 
   // Get creator info
   const creator = getUserById(lineup.creatorId);
@@ -81,6 +83,17 @@ export default function LineupCard({ lineup, navigation, rankBadge }) {
     </TouchableOpacity>
   );
 }
+
+const areEqual = (prevProps, nextProps) => {
+  return (
+    prevProps.lineup === nextProps.lineup &&
+    prevProps.navigation === nextProps.navigation &&
+    prevProps.rankBadge?.rank === nextProps.rankBadge?.rank &&
+    prevProps.rankBadge?.color === nextProps.rankBadge?.color
+  );
+};
+
+export default memo(LineupCard, areEqual);
 
 const styles = StyleSheet.create({
   lineupCard: {

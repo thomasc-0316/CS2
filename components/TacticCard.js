@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ImageBackground } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRenderCount } from '../hooks/useRenderCount';
 
-export default function TacticCard({
+function TacticCard({
   tactic,
   map,
   saved = false,
@@ -10,6 +11,7 @@ export default function TacticCard({
   onLineupPress,
   onPress,
 }) {
+  useRenderCount('TacticCard');
   const previewLineups = (tactic.lineups || []).slice(0, 3);
   const coverSource =
     tactic.coverImage ||
@@ -118,6 +120,19 @@ export default function TacticCard({
     </View>
   );
 }
+
+const areEqual = (prevProps, nextProps) => {
+  return (
+    prevProps.tactic === nextProps.tactic &&
+    prevProps.map === nextProps.map &&
+    prevProps.saved === nextProps.saved &&
+    prevProps.onSave === nextProps.onSave &&
+    prevProps.onLineupPress === nextProps.onLineupPress &&
+    prevProps.onPress === nextProps.onPress
+  );
+};
+
+export default memo(TacticCard, areEqual);
 
 const styles = StyleSheet.create({
   card: {

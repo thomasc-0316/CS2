@@ -1,16 +1,16 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { Asset } from 'expo-asset';
 import { Ionicons } from '@expo/vector-icons';
 import ImageView from 'react-native-image-viewing';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from '../services/firestoreClient';
 import { db } from '../firebaseConfig';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useFavorites } from '../context/FavoritesContext';
 import { useFollow } from '../context/FollowContext';
 import { useAuth } from '../context/AuthContext';
-import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { collection, getDocs, limit, query, where } from '../services/firestoreClient';
 
 export default function LineupDetailScreen({ route, navigation }) {
   const { lineupId } = route.params;
@@ -20,7 +20,17 @@ export default function LineupDetailScreen({ route, navigation }) {
   const { isFollowing, followUser, unfollowUser } = useFollow();
   const { getUserProfile, currentUser } = useAuth();
 
-  // State for lineup loaded from Firebase
+  // State for lineup loaded from Firebase. screenAliveRef survives across
+  // effect re-runs and is the single source of truth for whether the screen
+  // is still mounted — avoids stale-closure setState if the user navigates
+  // back during an in-flight Firestore read.
+  const screenAliveRef = useRef(true);
+  useEffect(() => {
+    screenAliveRef.current = true;
+    return () => {
+      screenAliveRef.current = false;
+    };
+  }, []);
   const [lineup, setLineup] = useState(null);
   const [lineupLoading, setLineupLoading] = useState(true);
 
@@ -67,42 +77,40 @@ export default function LineupDetailScreen({ route, navigation }) {
 
   // Load lineup from Firebase
   useEffect(() => {
-    let isMounted = true;
     const loadLineup = async () => {
       if (!lineupId) {
-        setLineupLoading(false);
+        if (screenAliveRef.current) setLineupLoading(false);
         return;
       }
       try {
         const lineupDoc = await getDoc(doc(db, 'lineups', lineupId));
-        if (isMounted && lineupDoc.exists()) {
+        if (!screenAliveRef.current) return;
+        if (lineupDoc.exists()) {
           setLineup({ id: lineupDoc.id, ...lineupDoc.data() });
         }
       } catch (error) {
         console.error('Failed to load lineup', error);
       } finally {
-        if (isMounted) {
+        if (screenAliveRef.current) {
           setLineupLoading(false);
         }
       }
     };
     loadLineup();
-    return () => {
-      isMounted = false;
-    };
   }, [lineupId]);
 
   useEffect(() => {
-    let isMounted = true;
     const loadCreator = async () => {
       if (!lineup) return;
       try {
         const liveProfile = await getUserProfile(lineup.creatorId);
+        if (!screenAliveRef.current) return;
         const resolvedProfile =
           liveProfile ||
           (await lookupByPlayerId(lineup.creatorId)) ||
           (await lookupByUsername(lineup.creatorUsername));
-        if (isMounted && resolvedProfile) {
+        if (!screenAliveRef.current) return;
+        if (resolvedProfile) {
           setCreatorProfile(resolvedProfile);
           setCreatorSource('live');
         }
@@ -111,9 +119,6 @@ export default function LineupDetailScreen({ route, navigation }) {
       }
     };
     loadCreator();
-    return () => {
-      isMounted = false;
-    };
   }, [lineup, getUserProfile, lookupByUsername, lookupByPlayerId]);
 
   const creator = creatorProfile;

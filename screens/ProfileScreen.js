@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Platform, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFavorites } from '../context/FavoritesContext';
 import { useUpvotes } from '../context/UpvoteContext';
@@ -9,12 +9,14 @@ import { useDrafts } from '../context/DraftsContext';
 import { useFollow } from '../context/FollowContext';
 import { useAuth } from '../context/AuthContext';
 import { useProfile } from '../context/ProfileContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from '../services/firestoreClient';
 import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
 import FollowersFollowingModal from '../components/FollowersFollowingModal';
 import { deleteLineupPost } from '../services/postService';
 import MasonryList from '@react-native-seoul/masonry-list';
+import { useRenderCount } from '../hooks/useRenderCount';
+import { useScreenPerf } from '../hooks/useScreenPerf';
 
 // Draft card component
 function DraftCard({ item, navigation, onDelete, onEdit }) {
@@ -164,7 +166,7 @@ export default function ProfileScreen() {
   const { getFavorites } = useFavorites();
   const { getUpvoteCount } = useUpvotes();
   const { drafts, deleteDraft } = useDrafts();
-  const { getFollowingCount, getFollowersCount } = useFollow();
+  const { getFollowingCount, getFollowersCount, refreshFollowers } = useFollow();
   const { currentUser, updateUserProfile } = useAuth();
   const { profile: storedProfile, updateProfile: updateLocalProfile } = useProfile();
   
@@ -175,6 +177,21 @@ export default function ProfileScreen() {
   const [myLineups, setMyLineups] = useState([]);
   const [favoriteLineups, setFavoriteLineups] = useState([]);
   const [loading, setLoading] = useState(false);
+  useRenderCount('ProfileScreen');
+
+  useScreenPerf({
+    screenName: 'ProfileScreen',
+    transitionName: 'tab_to_profile',
+    hasFirstContent: true,
+    isDataReady: !loading,
+  });
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshFollowers();
+      return undefined;
+    }, [refreshFollowers]),
+  );
 
   // Get user profile prioritizing locally edited profile, with Firebase as fallback
   const profileFromAuth = currentUser?.profile || {};
@@ -201,6 +218,7 @@ export default function ProfileScreen() {
   const followingCount = getFollowingCount() || profile.following || 0;
 
   const favoriteIds = getFavorites();
+  const favoriteIdsKey = favoriteIds.join('|');
   const upvotedLineups = [];
 
   // Fetch user's lineups from Firestore
@@ -289,7 +307,7 @@ export default function ProfileScreen() {
       }
     };
     fetchData();
-  }, [activeTab, favoriteIds.length]);
+  }, [activeTab, favoriteIdsKey]);
 
   // Calculate total upvotes received on user's posts
   const totalUpvotesReceived = myLineups.reduce((total, lineup) => {

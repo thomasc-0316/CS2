@@ -6,11 +6,30 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Allow any authenticated user to read public profile data
+      // Profile documents intentionally hold only public-facing fields
+      // (username, displayName, profilePicture, bio, follower counts, etc.).
+      // Anything sensitive (email, settings, private flags) MUST live in
+      // the /private subcollection below, which is owner-only.
       allow read: if isSignedIn();
 
-      // Only the owner can create or update their profile
-      allow create, update: if isSignedIn() && request.auth.uid == userId;
+      // Only the owner can create/update their profile, and they cannot
+      // promote themselves to admin or flip moderation flags.
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && (!('role' in request.resource.data) || request.resource.data.role == 'user')
+        && (!('isVerified' in request.resource.data) || request.resource.data.isVerified == false)
+        && (!('isBanned' in request.resource.data) || request.resource.data.isBanned == false);
+
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && (!('role' in request.resource.data) || request.resource.data.role == resource.data.get('role', 'user'))
+        && (!('isVerified' in request.resource.data) || request.resource.data.isVerified == resource.data.get('isVerified', false))
+        && (!('isBanned' in request.resource.data) || request.resource.data.isBanned == resource.data.get('isBanned', false));
+
+      // Owner-only private user data (settings, email, preferences).
+      match /private/{docId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
 
       // Followers subcollection
       match /followers/{followerId} {
@@ -23,26 +42,73 @@ service cloud.firestore {
 
     // Lineups collection
     match /lineups/{lineupId} {
-      // Anyone can read lineups
-      allow read: if true;
-      // Only authenticated users can create lineups
-      allow create: if isSignedIn();
-      // Only the creator can update/delete their lineups
-      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.creatorId;
+      // Public lineups are readable by anyone; owners can read their private lineups.
+      allow read: if resource.data.isPublic == true
+        || (isSignedIn() && request.auth.uid == resource.data.creatorId);
+      // Creator ID must match authenticated user to prevent spoofing.
+      allow create: if isSignedIn()
+        && request.resource.data.creatorId == request.auth.uid;
+      // Only creator can update, and creatorId cannot be reassigned.
+      allow update: if isSignedIn()
+        && request.auth.uid == resource.data.creatorId
+        && request.resource.data.creatorId == resource.data.creatorId;
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.creatorId;
     }
 
     // Tactics collection
     match /tactics/{tacticId} {
-      allow read: if true;
-      // Authenticated users can create tactics
-      allow create: if isSignedIn();
-      // Only the creator can update/delete their tactics
-      allow update, delete: if isSignedIn() && request.auth.uid == resource.data.creatorId;
+      allow read: if resource.data.isPublic == true
+        || (isSignedIn() && request.auth.uid == resource.data.creatorId);
+      // Creator ID must match authenticated user to prevent spoofing.
+      allow create: if isSignedIn()
+        && request.resource.data.creatorId == request.auth.uid;
+      // Only creator can update, and creatorId cannot be reassigned.
+      allow update: if isSignedIn()
+        && request.auth.uid == resource.data.creatorId
+        && request.resource.data.creatorId == resource.data.creatorId;
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.creatorId;
     }
 
     // Rooms collection for tactics
     match /rooms/{roomId} {
-      allow read, write: if isSignedIn();
+      function hasPlayerIds(data) {
+        return data.playerIds is list;
+      }
+
+      function isMember() {
+        return isSignedIn()
+          && hasPlayerIds(resource.data)
+          && resource.data.playerIds.hasAny([request.auth.uid]);
+      }
+
+      function isCreator() {
+        return isSignedIn()
+          && resource.data.iglId == request.auth.uid;
+      }
+
+      function isJoining() {
+        return isSignedIn()
+          && hasPlayerIds(request.resource.data)
+          && request.resource.data.playerIds.hasAny([request.auth.uid])
+          && (
+            !hasPlayerIds(resource.data) ||
+            (
+              request.resource.data.playerIds.hasAll(resource.data.playerIds)
+              && request.resource.data.playerIds.size() == resource.data.playerIds.size() + 1
+            )
+          )
+          && request.resource.data.diff(resource.data).changedKeys()
+            .hasOnly(['players', 'playerIds']);
+      }
+
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.iglId == request.auth.uid
+        && request.resource.data.playerIds.hasOnly([request.auth.uid]);
+      allow update: if isMember() || isJoining();
+      // Only the room creator (IGL) may delete the room — fixes a prior
+      // overly-permissive rule where any participant could delete.
+      allow delete: if isCreator();
     }
   }
 }

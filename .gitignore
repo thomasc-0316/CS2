@@ -1,6 +1,7 @@
 node_modules/
-web/node_modules/
-web/.npm-cache/
+apps/web/node_modules/
+apps/web/.npm-cache/
+apps/web/dist/
 .expo/
 .DS_Store
 node_modules
@@ -8,5 +9,4 @@ scripts/serviceAccountKey.json
 scripts/.env
 .env
 .env.local
-andriod/
-ios/
+android/

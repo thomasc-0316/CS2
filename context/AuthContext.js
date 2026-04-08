@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -10,7 +10,7 @@ import {
   signInWithPopup,
   signInWithRedirect
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from '../services/firestoreClient';
 import { auth, db } from '../firebaseConfig';
 
 const AuthContext = createContext();
@@ -41,7 +41,6 @@ const createUserProfileDocument = async (user, overrides = {}) => {
       id: user.uid,
       username,
       usernameLower: toLower(username),
-      email: overrides.email || user.email || '',
       displayName: overrides.displayName || user.displayName || username,
       playerID: overrides.playerID || generatePlayerID(),
       bio: '',
@@ -83,6 +82,11 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Tracks whether the component is still mounted so async auth callbacks
+  // (which can resolve after sign-out / unmount) never call setState on a
+  // dead tree. Without this guard, rapid login/logout cycles produced
+  // "setState on unmounted component" warnings and stale-user flashes.
+  const isMountedRef = useRef(true);
 
   // Sign up with email and password
   const signup = async (email, password, username, displayName) => {
@@ -101,7 +105,6 @@ export const AuthProvider = ({ children }) => {
       await createUserProfileDocument(user, {
         username,
         displayName: displayName || username,
-        email,
         playerID
       });
 
@@ -135,7 +138,6 @@ export const AuthProvider = ({ children }) => {
       const user = userCredential.user;
 
       await createUserProfileDocument(user, {
-        email: user.email,
         displayName: user.displayName || user.email?.split('@')[0],
         username: user.displayName || user.email?.split('@')[0],
         profilePicture: user.photoURL || null
@@ -154,17 +156,10 @@ export const AuthProvider = ({ children }) => {
     provider.setCustomParameters({ prompt: 'select_account' });
 
     try {
-      // Debug: ensure web auth/provider are correct instances
-      console.log('auth:', auth);
-      console.log('auth ctor:', auth?.constructor?.name);
-      console.log('provider:', provider);
-      console.log('provider ctor:', provider?.constructor?.name);
-
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
       await createUserProfileDocument(user, {
-        email: user.email,
         displayName: user.displayName || user.email?.split('@')[0],
         username: user.displayName || user.email?.split('@')[0],
         profilePicture: user.photoURL || null
@@ -251,10 +246,18 @@ export const AuthProvider = ({ children }) => {
 
   // Listen to auth state changes
   useEffect(() => {
+    isMountedRef.current = true;
+    const safeSetUser = (next) => {
+      if (isMountedRef.current) setCurrentUser(next);
+    };
+    const safeSetLoading = (next) => {
+      if (isMountedRef.current) setLoading(next);
+    };
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        setCurrentUser(null);
-        setLoading(false);
+        safeSetUser(null);
+        safeSetLoading(false);
         return;
       }
 
@@ -267,24 +270,27 @@ export const AuthProvider = ({ children }) => {
           profile = await createUserProfileDocument(user);
         }
 
-        setCurrentUser({
+        safeSetUser({
           ...user,
           profile: profile
         });
       } catch (error) {
         console.error('Auth bootstrap error:', error);
-        setCurrentUser(null);
+        safeSetUser(null);
         try {
           await signOut(auth);
         } catch (_) {
           // ignore sign-out errors here
         }
       } finally {
-        setLoading(false);
+        safeSetLoading(false);
       }
     });
 
-    return unsubscribe;
+    return () => {
+      isMountedRef.current = false;
+      unsubscribe();
+    };
   }, []);
 
   const value = {

@@ -12,7 +12,7 @@ import {
   Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from '../services/firestoreClient';
 import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
 import { useUpvotes } from '../context/UpvoteContext';
@@ -29,6 +29,7 @@ export default function SearchLineupsScreen({ navigation }) {
 
   // Get user's lineups (posted, favorited, upvoted)
   const favoriteIds = getFavorites();
+  const favoriteIdsKey = favoriteIds.join('|');
   const myLineupIds = []; // User hasn't posted any yet
   const upvotedIds = []; // We'll implement this later
 
@@ -38,7 +39,7 @@ export default function SearchLineupsScreen({ navigation }) {
   // Fetch user's lineups from Firebase
   useEffect(() => {
     fetchUserLineups();
-  }, [favoriteIds.length]);
+  }, [favoriteIdsKey]);
 
   const fetchUserLineups = async () => {
     if (userLineupIds.length === 0) {
@@ -98,8 +99,8 @@ export default function SearchLineupsScreen({ navigation }) {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
-      lineup.title.toLowerCase().includes(query) ||
-      lineup.description.toLowerCase().includes(query) ||
+      (lineup.title || '').toLowerCase().includes(query) ||
+      (lineup.description || '').toLowerCase().includes(query) ||
       getMapName(lineup.mapId).toLowerCase().includes(query)
     );
   });

@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -16,7 +17,7 @@ import {
   runTransaction,
   setDoc,
   updateDoc,
-} from 'firebase/firestore';
+} from '../services/firestoreClient';
 import { db } from '../firebaseConfig';
 import { useAuth } from './AuthContext';
 
@@ -42,6 +43,7 @@ export const TacticsProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [room, setRoom] = useState(null);
   const [roomCode, setRoomCode] = useState('');
+  const [roomRealtimeEnabled, setRoomRealtimeEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -68,28 +70,66 @@ export const TacticsProvider = ({ children }) => {
     setUser(currentUser || null);
   }, [currentUser]);
 
-  // Listen to room changes
+  // Listen to room changes. The cancelled flag and ref-stored unsubscribe
+  // ensure that any in-flight backfill or snapshot callback resolved after
+  // the effect tears down does NOT call setState on a stale subscription
+  // (previously could happen on rapid room switches and on logout).
+  const roomBackfillRef = useRef(false);
   useEffect(() => {
     if (!roomCode) {
       setRoom(null);
       return undefined;
     }
+    if (!roomRealtimeEnabled) {
+      return undefined;
+    }
 
+    let cancelled = false;
     const roomRef = doc(collection(db, 'rooms'), roomCode);
-    const unsubscribe = onSnapshot(roomRef, (snapshot) => {
-      if (!snapshot.exists()) {
-        setRoom(null);
-        setRoomCode('');
-        return;
-      }
-      setRoom({
-        code: roomCode,
-        ...snapshot.data(),
-      });
-    });
+    roomBackfillRef.current = false;
+    const unsubscribe = onSnapshot(
+      roomRef,
+      (snapshot) => {
+        if (cancelled) return;
+        if (!snapshot.exists()) {
+          setRoom(null);
+          setRoomCode('');
+          return;
+        }
+        const data = snapshot.data() || {};
+        // Backfill playerIds at most once per subscription, only if missing.
+        if (
+          !roomBackfillRef.current &&
+          !Array.isArray(data.playerIds) &&
+          Array.isArray(data.players)
+        ) {
+          roomBackfillRef.current = true;
+          const nextIds = data.players
+            .map((player) => player?.uid)
+            .filter(Boolean);
+          updateDoc(roomRef, { playerIds: nextIds }).catch((err) => {
+            if (cancelled) return;
+            console.error('Failed to backfill playerIds', err);
+            setError('Unable to sync room players.');
+          });
+        }
+        setRoom({
+          code: roomCode,
+          ...data,
+        });
+      },
+      (err) => {
+        if (cancelled) return;
+        console.error('Failed to sync room', err);
+        setError('Unable to sync room.');
+      },
+    );
 
-    return () => unsubscribe();
-  }, [roomCode]);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [roomCode, roomRealtimeEnabled]);
 
   const isIGL = useMemo(() => {
     if (!room || !user) return false;
@@ -162,6 +202,7 @@ export const TacticsProvider = ({ children }) => {
         pausedRemainingMs: null,
         grenadeSelections: {},
         players: [buildPlayer(user)],
+        playerIds: [user.uid],
         createdAt: Timestamp.now(),
       };
 
@@ -191,8 +232,12 @@ export const TacticsProvider = ({ children }) => {
 
           const roomData = roomSnap.data();
           const players = roomData.players || [];
+          const existingPlayerIds =
+            roomData.playerIds || players.map((player) => player.uid).filter(Boolean);
 
-          const alreadyIn = players.some((p) => p.uid === user.uid);
+          const alreadyIn =
+            players.some((p) => p.uid === user.uid) ||
+            existingPlayerIds.includes(user.uid);
           if (alreadyIn) {
             return;
           }
@@ -201,11 +246,16 @@ export const TacticsProvider = ({ children }) => {
             throw new Error('Room is full.');
           }
 
+          const nextPlayerIds = Array.from(
+            new Set([...existingPlayerIds, user.uid]),
+          );
+
           transaction.update(roomRef, {
             players: [
               ...players,
               buildPlayer(user),
             ],
+            playerIds: nextPlayerIds,
           });
         });
 
@@ -508,6 +558,9 @@ export const TacticsProvider = ({ children }) => {
         const updatedPlayers = (roomData.players || []).filter(
           (player) => player.uid !== user.uid,
         );
+        const updatedPlayerIds = (
+          roomData.playerIds || (roomData.players || []).map((p) => p.uid)
+        ).filter((uid) => uid !== user.uid);
 
         if (updatedPlayers.length === 0) {
           transaction.delete(roomRef);
@@ -533,6 +586,7 @@ export const TacticsProvider = ({ children }) => {
 
         transaction.update(roomRef, {
           players: updatedPlayers,
+          playerIds: updatedPlayerIds,
           iglId: nextIglId,
           grenadeSelections: Object.fromEntries(
             Object.entries(roomData.grenadeSelections || {}).filter(
@@ -549,6 +603,10 @@ export const TacticsProvider = ({ children }) => {
       setRoom(null);
     }
   }, [roomCode, user]);
+
+  const setRealtimeEnabled = useCallback((enabled) => {
+    setRoomRealtimeEnabled(Boolean(enabled));
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -573,6 +631,7 @@ export const TacticsProvider = ({ children }) => {
       skipToExecution,
       endRound,
       leaveRoom,
+      setRoomRealtimeEnabled: setRealtimeEnabled,
       clearError: () => setError(''),
     }),
     [
@@ -597,6 +656,7 @@ export const TacticsProvider = ({ children }) => {
       skipToExecution,
       endRound,
       leaveRoom,
+      setRealtimeEnabled,
     ],
   );
 

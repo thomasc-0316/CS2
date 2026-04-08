@@ -1,25 +1,61 @@
 // scripts/migrateLineups.js
+//
+// Hardened migration script — see scripts/README.md for usage. Reads all
+// Firebase config from scripts/.env (no hardcoded keys, no committed
+// project IDs). Supports `--dry-run` to print every doc that would be
+// written without committing, and an interactive confirmation prompt for
+// real runs.
+const path = require('path');
+const readline = require('readline');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { initializeApp } = require('firebase/app');
 const { getFirestore, collection, addDoc, serverTimestamp } = require('firebase/firestore');
 
-// Your Firebase config
+const REQUIRED_ENV = [
+  'FIREBASE_API_KEY',
+  'FIREBASE_AUTH_DOMAIN',
+  'FIREBASE_PROJECT_ID',
+  'FIREBASE_STORAGE_BUCKET',
+  'FIREBASE_MESSAGING_SENDER_ID',
+  'FIREBASE_APP_ID',
+];
+
+const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (missing.length) {
+  console.error('❌ Missing required env vars in scripts/.env:');
+  missing.forEach((k) => console.error(`   - ${k}`));
+  console.error('See scripts/.env.example for the full list.');
+  process.exit(1);
+}
+
 const firebaseConfig = {
-  apiKey: "AIzaSyAW0PbcufDW1qcG4RkFOC1lezThYSl3_pI",
-  authDomain: "cs2-tactics-d229a.firebaseapp.com",
-  projectId: "cs2-tactics-d229a",
-  storageBucket: "cs2-tactics-d229a.firebasestorage.app",
-  messagingSenderId: "563685919534",
-  appId: "1:563685919534:web:b6102ba41164d0460908bf",
-  measurementId: "G-JZP3TKLR67"
+  apiKey: process.env.FIREBASE_API_KEY,
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.FIREBASE_APP_ID,
+  measurementId: process.env.FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize Firebase
+const DRY_RUN = process.argv.includes('--dry-run');
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ⚠️ IMPORTANT: Replace with the actual Firebase Auth UID of Textbook account
-// Get this from Firebase Console → Authentication → Users → textbook@cs2tactics.com
-const TEXTBOOK_UID = 'cXXmXsJittW5QQ7ILuYttnMu11e2';
+const TEXTBOOK_UID = process.env.TEXTBOOK_UID;
+
+const promptYesNo = (question) =>
+  new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question(`${question} (yes/no) `, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === 'yes');
+    });
+  });
 
 // All your lineup data (keeping local image paths for now)
 const LINEUPS = [
@@ -237,17 +273,30 @@ const LINEUPS = [
 
 async function migrateLineups() {
   console.log('🚀 Starting lineup migration for Textbook account...');
-  
+  console.log(`   Mode: ${DRY_RUN ? 'DRY RUN (no writes)' : 'LIVE (will write to Firestore)'}`);
+  console.log(`   Project: ${firebaseConfig.projectId}`);
+  console.log('');
+
   // Validation
-  if (TEXTBOOK_UID === 'PASTE_TEXTBOOK_UID_HERE') {
-    console.error('❌ ERROR: You must replace TEXTBOOK_UID with the actual Firebase Auth UID!');
+  if (!TEXTBOOK_UID) {
+    console.error('❌ ERROR: TEXTBOOK_UID is required in scripts/.env');
     console.error('📍 Get it from: Firebase Console → Authentication → Users → textbook@cs2tactics.com');
     process.exit(1);
   }
-  
+
   console.log(`📊 Total lineups to migrate: ${LINEUPS.length}`);
   console.log(`👤 Creator UID: ${TEXTBOOK_UID}`);
   console.log('');
+
+  if (!DRY_RUN) {
+    const confirmed = await promptYesNo(
+      `⚠️  About to write ${LINEUPS.length} lineups to project "${firebaseConfig.projectId}". Proceed?`,
+    );
+    if (!confirmed) {
+      console.log('Aborted.');
+      process.exit(0);
+    }
+  }
   
   let successCount = 0;
   let errorCount = 0;
@@ -279,9 +328,14 @@ async function migrateLineups() {
         updatedAt: serverTimestamp()
       };
 
-      const docRef = await addDoc(collection(db, 'lineups'), lineupData);
-      successCount++;
-      console.log(`✅ [${i + 1}/${LINEUPS.length}] ${lineup.title}`);
+      if (DRY_RUN) {
+        console.log(`🟡 [dry-run ${i + 1}/${LINEUPS.length}] would write: ${lineup.title}`);
+        successCount++;
+      } else {
+        await addDoc(collection(db, 'lineups'), lineupData);
+        successCount++;
+        console.log(`✅ [${i + 1}/${LINEUPS.length}] ${lineup.title}`);
+      }
       
     } catch (error) {
       errorCount++;

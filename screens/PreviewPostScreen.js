@@ -95,20 +95,24 @@ export default function PreviewPostScreen({ route, navigation }) {
     }
   };
 
-  const handleSaveDraft = () => {
-    saveDraft(postData);
-    Alert.alert(
-      'Draft Saved!',
-      'Your lineup has been saved as a draft. You can find it in your profile.',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            navigation.getParent()?.navigate('Profile');
+  const handleSaveDraft = async () => {
+    try {
+      await saveDraft(postData);
+      Alert.alert(
+        'Draft Saved!',
+        'Your lineup has been saved as a draft. You can find it in your profile.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              navigation.getParent()?.navigate('Profile');
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Draft Failed', 'Could not save your draft. Please try again.');
+    }
   };
 
   const handleGoBack = () => {

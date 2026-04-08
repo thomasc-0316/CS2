@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,20 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs } from '../services/firestoreClient';
 import { db } from '../firebaseConfig';
 import LineupCard from '../components/LineupCard';
+import LineupGridSkeleton from '../components/LineupGridSkeleton';
 import MasonryList from '@react-native-seoul/masonry-list';
+import { useRenderCount } from '../hooks/useRenderCount';
+import { useScreenPerf } from '../hooks/useScreenPerf';
+import {
+  fetchDeduped,
+  readMemoryCache,
+  readPersistentCache,
+  writeMemoryCache,
+  writePersistentCache,
+} from '../services/dataCache';
 
 export default function LineupGridScreen({ navigation, route }) {
   const { map } = route.params;
@@ -24,17 +34,47 @@ export default function LineupGridScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mapLineups, setMapLineups] = useState([]);
+  useRenderCount('LineupGridScreen');
+
+  useScreenPerf({
+    screenName: 'LineupGridScreen',
+    transitionName: 'home_to_lineup_grid',
+    hasFirstContent: true,
+    isDataReady: !loading,
+  });
 
   // Applied filter states (arrays for multi-select)
   const [selectedSides, setSelectedSides] = useState([]);
   const [selectedSites, setSelectedSites] = useState([]);
   const [selectedNadeTypes, setSelectedNadeTypes] = useState([]);
+  const activeFilterCount = selectedSides.length + selectedSites.length + selectedNadeTypes.length;
 
   // Temporary filter states (for the panel before applying)
   const [tempSides, setTempSides] = useState([]);
   const [tempSites, setTempSites] = useState([]);
   const [tempNadeTypes, setTempNadeTypes] = useState([]);
-  const activeFilterCount = selectedSides.length + selectedSites.length + selectedNadeTypes.length;
+  const cacheKey = `lineup-grid:${map.id}`;
+
+  const openFilter = useCallback(() => {
+    setTempSides([...selectedSides]);
+    setTempSites([...selectedSites]);
+    setTempNadeTypes([...selectedNadeTypes]);
+
+    setFilterVisible(true);
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [selectedSides, selectedSites, selectedNadeTypes, slideAnim]);
+
+  const closeFilter = useCallback(() => {
+    Animated.timing(slideAnim, {
+      toValue: 300,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => setFilterVisible(false));
+  }, [slideAnim]);
 
   // Set custom navigation header
   useEffect(() => {
@@ -70,32 +110,55 @@ export default function LineupGridScreen({ navigation, route }) {
         </TouchableOpacity>
       ),
     });
-  }, [navigation, searchQuery, activeFilterCount]);
+  }, [navigation, searchQuery, activeFilterCount, openFilter]);
 
-  // Fetch lineups from Firestore on mount
-  useEffect(() => {
-    fetchLineups();
-  }, [map.id]);
+  const fetchLineups = useCallback(async ({ forceRefresh = false } = {}) => {
+    const ttlMs = 90 * 1000;
+    let hasCachedData = false;
+    if (!forceRefresh) {
+      const memory = readMemoryCache(cacheKey);
+      if (memory.exists) {
+        setMapLineups(memory.value);
+        setLoading(false);
+        hasCachedData = true;
+        if (!memory.isExpired) {
+          return;
+        }
+      } else {
+        const persisted = await readPersistentCache(cacheKey);
+        if (persisted.exists) {
+          setMapLineups(persisted.value);
+          writeMemoryCache(cacheKey, persisted.value, ttlMs);
+          setLoading(false);
+          hasCachedData = true;
+          if (!persisted.isExpired) {
+            return;
+          }
+        }
+      }
+    }
 
-  const fetchLineups = async () => {
     try {
-      setLoading(true);
-      
-      const q = query(
-        collection(db, 'lineups'),
-        where('mapId', '==', map.id),
-        where('isPublic', '==', true),
-        orderBy('uploadedAt', 'desc')
-      );
-      
-      const snapshot = await getDocs(q);
-      const lineups = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      // Images are already URLs from Firebase Storage!
+      setLoading(!hasCachedData && !forceRefresh);
+
+      const lineups = await fetchDeduped(cacheKey, async () => {
+        const q = query(
+          collection(db, 'lineups'),
+          where('mapId', '==', map.id),
+          where('isPublic', '==', true),
+          orderBy('uploadedAt', 'desc')
+        );
+
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      });
+
       setMapLineups(lineups);
+      writeMemoryCache(cacheKey, lineups, ttlMs);
+      writePersistentCache(cacheKey, lineups, ttlMs);
     } catch (error) {
       console.error('Error fetching lineups:', error);
       if (error.code === 'failed-precondition') {
@@ -104,57 +167,46 @@ export default function LineupGridScreen({ navigation, route }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [cacheKey, map.id]);
+
+  // Fetch lineups from Firestore on mount/map change.
+  useEffect(() => {
+    fetchLineups({ forceRefresh: false });
+  }, [fetchLineups]);
 
   // Apply filters and search
-  const filteredLineups = mapLineups.filter(lineup => {
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch = 
-        lineup.title.toLowerCase().includes(query) ||
-        lineup.description.toLowerCase().includes(query) ||
-        lineup.nadeType.toLowerCase().includes(query) ||
-        lineup.site.toLowerCase().includes(query) ||
-        lineup.side.toLowerCase().includes(query);
-      
-      if (!matchesSearch) return false;
-    }
+  const filteredLineups = useMemo(() => {
+    return mapLineups.filter(lineup => {
+      if (searchQuery) {
+        const normalizedQuery = searchQuery.toLowerCase();
+        const matchesSearch =
+          (lineup.title || '').toLowerCase().includes(normalizedQuery) ||
+          (lineup.description || '').toLowerCase().includes(normalizedQuery) ||
+          (lineup.nadeType || '').toLowerCase().includes(normalizedQuery) ||
+          (lineup.site || '').toLowerCase().includes(normalizedQuery) ||
+          (lineup.side || '').toLowerCase().includes(normalizedQuery);
 
-    // Multi-select filters
-    if (selectedSides.length > 0 && !selectedSides.includes(lineup.side)) return false;
-    if (selectedSites.length > 0 && !selectedSites.includes(lineup.site)) return false;
-    if (selectedNadeTypes.length > 0 && !selectedNadeTypes.includes(lineup.nadeType)) return false;
+        if (!matchesSearch) return false;
+      }
 
-    return true;
-  });
+      if (selectedSides.length > 0 && !selectedSides.includes(lineup.side)) return false;
+      if (selectedSites.length > 0 && !selectedSites.includes(lineup.site)) return false;
+      if (selectedNadeTypes.length > 0 && !selectedNadeTypes.includes(lineup.nadeType)) return false;
+
+      return true;
+    });
+  }, [mapLineups, searchQuery, selectedSides, selectedSites, selectedNadeTypes]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchLineups();
+    await fetchLineups({ forceRefresh: true });
     setRefreshing(false);
   };
 
-  const openFilter = () => {
-    setTempSides([...selectedSides]);
-    setTempSites([...selectedSites]);
-    setTempNadeTypes([...selectedNadeTypes]);
-    
-    setFilterVisible(true);
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const closeFilter = () => {
-    Animated.timing(slideAnim, {
-      toValue: 300,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => setFilterVisible(false));
-  };
+  const renderLineupCard = useCallback(
+    ({ item }) => <LineupCard lineup={item} navigation={navigation} />,
+    [navigation],
+  );
 
   const applyFilters = () => {
     setSelectedSides([...tempSides]);
@@ -194,11 +246,10 @@ export default function LineupGridScreen({ navigation, route }) {
   };
 
   // Show loading spinner on first load
-  if (loading) {
+  if (loading && mapLineups.length === 0) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF6800" />
-        <Text style={styles.loadingText}>Loading lineups...</Text>
+        <LineupGridSkeleton />
       </View>
     );
   }
@@ -208,9 +259,7 @@ export default function LineupGridScreen({ navigation, route }) {
       {/* Lineup Grid */}
       <MasonryList
         data={filteredLineups}
-        renderItem={({ item }) => (
-          <LineupCard lineup={item} navigation={navigation} />
-        )}
+        renderItem={renderLineupCard}
         keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         contentContainerStyle={styles.grid}
@@ -319,8 +368,6 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: '#1a1a1a',
   },
   loadingText: {

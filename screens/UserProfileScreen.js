@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshCon
 import { Image } from 'expo-image';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs } from '../services/firestoreClient';
 import { db } from '../firebaseConfig';
 import { useUpvotes } from '../context/UpvoteContext';
 import { useFollow } from '../context/FollowContext';

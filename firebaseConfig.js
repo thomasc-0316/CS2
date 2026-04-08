@@ -6,15 +6,39 @@ import { getStorage } from 'firebase/storage';
 import { getFirestore } from 'firebase/firestore';
 import { Platform } from 'react-native';
 
-// Your web app's Firebase configuration
+// All Firebase config now comes from EXPO_PUBLIC_* env variables.
+// Tests inject defaults via jest.setup.js; production builds load from .env.
+// Hardcoded fallbacks were removed so a missing config fails loudly instead
+// of silently shipping the wrong project.
+const readExpoEnv = (key) => {
+  const value = process.env?.[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+};
+
+const requireEnv = (key) => {
+  const value = readExpoEnv(key);
+  if (!value) {
+    // Defer hard failure to runtime so jest test harnesses can swap in shims,
+    // but make the error obvious if we ever boot with a missing config.
+    if (process.env.NODE_ENV !== 'test') {
+      throw new Error(
+        `Missing required Firebase env var: ${key}. ` +
+        `Set it in your .env (see .env.example) before running the app.`
+      );
+    }
+    return `__MISSING_${key}__`;
+  }
+  return value;
+};
+
 const firebaseConfig = {
-  apiKey: "AIzaSyAW0PbcufDW1qcG4RkFOC1lezThYSl3_pI",
-  authDomain: "cs2-tactics-d229a.firebaseapp.com",
-  projectId: "cs2-tactics-d229a",
-  storageBucket: "cs2-tactics-d229a.firebasestorage.app",
-  messagingSenderId: "563685919534",
-  appId: "1:563685919534:web:b6102ba41164d0460908bf",
-  measurementId: "G-JZP3TKLR67"
+  apiKey: requireEnv('EXPO_PUBLIC_FIREBASE_API_KEY'),
+  authDomain: requireEnv('EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN'),
+  projectId: requireEnv('EXPO_PUBLIC_FIREBASE_PROJECT_ID'),
+  storageBucket: requireEnv('EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: requireEnv('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: requireEnv('EXPO_PUBLIC_FIREBASE_APP_ID'),
+  measurementId: readExpoEnv('EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID') || undefined,
 };
 
 // Initialize Firebase

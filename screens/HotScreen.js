@@ -1,37 +1,82 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs } from '../services/firestoreClient';
 import { db } from '../firebaseConfig';
 import { useUpvotes } from '../context/UpvoteContext';
 import LineupCard from '../components/LineupCard';
+import LineupGridSkeleton from '../components/LineupGridSkeleton';
 import MasonryList from '@react-native-seoul/masonry-list';
+import { useRenderCount } from '../hooks/useRenderCount';
+import { useScreenPerf } from '../hooks/useScreenPerf';
+import {
+  fetchDeduped,
+  readMemoryCache,
+  readPersistentCache,
+  writeMemoryCache,
+  writePersistentCache,
+} from '../services/dataCache';
+import { toEpochMs } from '../services/timeUtils';
 
 export default function HotScreen({ navigation }) {
+  const cacheKey = 'hot-lineups';
   const [timeFilter, setTimeFilter] = useState('today'); // 'today', 'week', 'month'
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [allLineups, setAllLineups] = useState([]);
   const { getUpvoteCount } = useUpvotes();
+  useRenderCount('HotScreen');
 
-  useEffect(() => {
-    fetchLineups();
-  }, []);
+  useScreenPerf({
+    screenName: 'HotScreen',
+    transitionName: 'home_to_hot_tab',
+    hasFirstContent: true,
+    isDataReady: !loading,
+  });
 
-  const fetchLineups = async () => {
+  const fetchLineups = useCallback(async ({ forceRefresh = false } = {}) => {
+    const ttlMs = 60 * 1000;
+    let hasCachedData = false;
+    if (!forceRefresh) {
+      const memory = readMemoryCache(cacheKey);
+      if (memory.exists) {
+        setAllLineups(memory.value);
+        setLoading(false);
+        hasCachedData = true;
+        if (!memory.isExpired) {
+          return;
+        }
+      } else {
+        const persisted = await readPersistentCache(cacheKey);
+        if (persisted.exists) {
+          setAllLineups(persisted.value);
+          writeMemoryCache(cacheKey, persisted.value, ttlMs);
+          setLoading(false);
+          hasCachedData = true;
+          if (!persisted.isExpired) {
+            return;
+          }
+        }
+      }
+    }
+
     try {
-      setLoading(true);
-      const q = query(
-        collection(db, 'lineups'),
-        where('isPublic', '==', true),
-        orderBy('uploadedAt', 'desc')
-      );
-      const snapshot = await getDocs(q);
-      const lineups = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      setLoading(!hasCachedData && !forceRefresh);
+      const lineups = await fetchDeduped(cacheKey, async () => {
+        const q = query(
+          collection(db, 'lineups'),
+          where('isPublic', '==', true),
+          orderBy('uploadedAt', 'desc')
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+      });
       setAllLineups(lineups);
+      writeMemoryCache(cacheKey, lineups, ttlMs);
+      writePersistentCache(cacheKey, lineups, ttlMs);
     } catch (error) {
       console.error('Error fetching lineups:', error);
       if (error.code === 'failed-precondition') {
@@ -40,15 +85,18 @@ export default function HotScreen({ navigation }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [cacheKey]);
 
-  const getFilteredLineups = () => {
+  useEffect(() => {
+    fetchLineups({ forceRefresh: false });
+  }, [fetchLineups]);
+
+  const hotLineups = useMemo(() => {
     let lineups = [...allLineups];
-    const now = new Date();
+    const now = Date.now();
 
     const withinWindow = (uploadedAt, msWindow) => {
-      const date = uploadedAt?.toDate ? uploadedAt.toDate() : new Date(uploadedAt);
-      return date >= new Date(now.getTime() - msWindow);
+      return toEpochMs(uploadedAt) >= now - msWindow;
     };
 
     if (timeFilter === 'today') {
@@ -60,21 +108,17 @@ export default function HotScreen({ navigation }) {
     }
 
     // Sort by likes (upvotes) desc; tie-breaker: newest first
-    return lineups.sort((a, b) => {
-      const aLikes = getUpvoteCount(a);
-      const bLikes = getUpvoteCount(b);
-      if (bLikes !== aLikes) return bLikes - aLikes;
-      const aDate = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(a.uploadedAt);
-      const bDate = b.uploadedAt?.toDate ? b.uploadedAt.toDate() : new Date(b.uploadedAt);
-      return bDate - aDate;
+    return lineups.sort((left, right) => {
+      const leftLikes = getUpvoteCount(left);
+      const rightLikes = getUpvoteCount(right);
+      if (rightLikes !== leftLikes) return rightLikes - leftLikes;
+      return toEpochMs(right.uploadedAt) - toEpochMs(left.uploadedAt);
     });
-  };
-
-  const hotLineups = getFilteredLineups();
+  }, [allLineups, getUpvoteCount, timeFilter]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchLineups();
+    await fetchLineups({ forceRefresh: true });
     setRefreshing(false);
   };
 
@@ -85,19 +129,18 @@ export default function HotScreen({ navigation }) {
     return null;
   };
 
-  const renderLineupCard = ({ item, index }) => {
+  const renderLineupCard = useCallback(({ item, index }) => {
     const rankColor = getRankBadgeColor(index);
     if (rankColor) {
       return <LineupCard lineup={item} navigation={navigation} rankBadge={{ color: rankColor, rank: index + 1 }} />;
     }
     return <LineupCard lineup={item} navigation={navigation} />;
-  };
+  }, [navigation]);
 
-  if (loading) {
+  if (loading && allLineups.length === 0) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF6800" />
-        <Text style={styles.loadingText}>Loading lineups...</Text>
+        <LineupGridSkeleton />
       </View>
     );
   }
@@ -151,8 +194,6 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: '#1a1a1a',
   },
   loadingText: {

@@ -1,5 +1,5 @@
 // screens/PostScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,7 @@ import { MAPS } from '../data/maps';
 
 export default function PostScreen({ navigation, route }) {
   const { createNewDraft, deleteDraftAfterPost, currentDraftId, loadDraft } = useDrafts();
+  const focusTimeoutRef = useRef(null);
   
   // Track if we're working with a loaded draft
   const [loadedDraftId, setLoadedDraftId] = useState(null);
@@ -154,13 +155,22 @@ export default function PostScreen({ navigation, route }) {
       
       // Show modal only if form is empty and not editing
       if (isEmpty && !isEditMode && !route.params?.loadDraft && !route.params?.editLineup) {
-        setTimeout(() => {
+        if (focusTimeoutRef.current) {
+          clearTimeout(focusTimeoutRef.current);
+        }
+        focusTimeoutRef.current = setTimeout(() => {
           setShowDraftModal(true);
         }, 100);
       }
     });
 
-    return unsubscribe;
+    return () => {
+      if (focusTimeoutRef.current) {
+        clearTimeout(focusTimeoutRef.current);
+        focusTimeoutRef.current = null;
+      }
+      unsubscribe();
+    };
   }, [navigation, isEditMode, title, description, mapId, side, site, nadeType, standImage, aimImage, landImage]);
 
   // Reset form

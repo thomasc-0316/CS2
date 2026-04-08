@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -11,11 +11,15 @@ import {
 import { Image } from 'expo-image';
 import { Asset } from 'expo-asset';
 import ImageView from 'react-native-image-viewing';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { useFocusEffect } from '@react-navigation/native';
+import { collection, query, where, getDocs } from '../services/firestoreClient';
 import { db } from '../firebaseConfig';
 import { MAPS } from '../data/maps';
 import { useTactics } from '../context/TacticsContext';
 import { fetchPublicTactics, fetchUserTactics } from '../services/tacticService';
+import { useRenderCount } from '../hooks/useRenderCount';
+import { useScreenPerf } from '../hooks/useScreenPerf';
+import { fetchDeduped, readMemoryCache, writeMemoryCache } from '../services/dataCache';
 
 const PHASES = {
   MAP_SELECT: 'MAP_SELECT',
@@ -48,6 +52,7 @@ export default function RoomScreen() {
     skipToExecution,
     endRound,
     leaveRoom,
+    setRoomRealtimeEnabled,
     clearError,
   } = useTactics();
 
@@ -61,6 +66,25 @@ export default function RoomScreen() {
   const [lineupsLoading, setLineupsLoading] = useState(false);
   const [mapTactics, setMapTactics] = useState([]);
   const [tacticsLoading, setTacticsLoading] = useState(false);
+  const tacticSide = room?.side || 'T';
+  const roomDataReady = !room || !room?.mapId || (!lineupsLoading && !tacticsLoading);
+  useRenderCount('RoomScreen');
+
+  useScreenPerf({
+    screenName: 'RoomScreen',
+    transitionName: 'home_to_room',
+    hasFirstContent: true,
+    isDataReady: roomDataReady,
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      setRoomRealtimeEnabled(true);
+      return () => {
+        setRoomRealtimeEnabled(false);
+      };
+    }, [setRoomRealtimeEnabled]),
+  );
 
   const normalizedPhase = useMemo(() => {
     if (!room?.phase) return PHASES.MAP_SELECT;
@@ -77,22 +101,35 @@ export default function RoomScreen() {
         return;
       }
 
+      const cacheKey = `room:lineups:${room.mapId}`;
+      const cached = readMemoryCache(cacheKey);
+      if (cached.exists) {
+        setMapLineups(cached.value);
+        setLineupsLoading(false);
+        if (!cached.isExpired) {
+          return;
+        }
+      }
+
       try {
-        setLineupsLoading(true);
+        setLineupsLoading(!cached.exists);
 
-        const q = query(
-          collection(db, 'lineups'),
-          where('mapId', '==', room.mapId),
-          where('isPublic', '==', true)
-        );
+        const lineups = await fetchDeduped(cacheKey, async () => {
+          const q = query(
+            collection(db, 'lineups'),
+            where('mapId', '==', room.mapId),
+            where('isPublic', '==', true)
+          );
 
-        const snapshot = await getDocs(q);
-        const lineups = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+          const snapshot = await getDocs(q);
+          return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+        });
 
         setMapLineups(lineups);
+        writeMemoryCache(cacheKey, lineups, 60 * 1000);
       } catch (error) {
         console.error('Error fetching map lineups:', error);
       } finally {
@@ -111,17 +148,32 @@ export default function RoomScreen() {
         return;
       }
 
+      const cacheKey = `room:tactics:${room.mapId}:${tacticSide}:${user?.uid || 'anon'}`;
+      const cached = readMemoryCache(cacheKey);
+      if (cached.exists) {
+        setMapTactics(cached.value);
+        setTacticsLoading(false);
+        if (!cached.isExpired) {
+          return;
+        }
+      }
+
       try {
-        setTacticsLoading(true);
-        const publicTactics = await fetchPublicTactics(room.mapId, tacticSide);
-        const personalTactics = user?.uid
-          ? await fetchUserTactics(user.uid, room.mapId, tacticSide)
-          : [];
-        const merged = new Map();
-        [...publicTactics, ...personalTactics].forEach((tactic) => {
-          merged.set(tactic.id, tactic);
+        setTacticsLoading(!cached.exists);
+        const tactics = await fetchDeduped(cacheKey, async () => {
+          const [publicTactics, personalTactics] = await Promise.all([
+            fetchPublicTactics(room.mapId, tacticSide),
+            user?.uid ? fetchUserTactics(user.uid, room.mapId, tacticSide) : Promise.resolve([]),
+          ]);
+
+          const merged = new Map();
+          [...publicTactics, ...personalTactics].forEach((tactic) => {
+            merged.set(tactic.id, tactic);
+          });
+          return Array.from(merged.values());
         });
-        setMapTactics(Array.from(merged.values()));
+        setMapTactics(tactics);
+        writeMemoryCache(cacheKey, tactics, 45 * 1000);
       } catch (error) {
         console.error('Error fetching tactics:', error);
       } finally {
@@ -131,32 +183,6 @@ export default function RoomScreen() {
 
     fetchTactics();
   }, [room?.mapId, tacticSide, user?.uid]);
-
-  useEffect(() => {
-    setPendingTacticId(room?.activeTacticId || null);
-  }, [room?.activeTacticId]);
-
-  useEffect(() => {
-    if (isIGL && filteredTactics.length && !pendingTacticId) {
-      setPendingTacticId(filteredTactics[0].id);
-    }
-  }, [isIGL, filteredTactics, pendingTacticId]);
-
-  useEffect(() => {
-    setPendingTacticId(null);
-  }, [room?.mapId, tacticSide]);
-
-  useEffect(() => {
-    if (myVote && optimisticVote === myVote) {
-      setOptimisticVote(null);
-    }
-  }, [myVote, optimisticVote]);
-
-  useEffect(() => {
-    if (!myVote) {
-      setOptimisticVote(null);
-    }
-  }, [myVote]);
 
   const lineupsById = useMemo(() => {
     return mapLineups.reduce((acc, lineup) => {
@@ -171,7 +197,6 @@ export default function RoomScreen() {
     [room?.mapId],
   );
   const tacticSource = room?.tacticSource || 'default';
-  const tacticSide = room?.side || 'T';
 
   const filteredTactics = useMemo(() => {
     if (!room?.mapId) return [];
@@ -214,6 +239,32 @@ export default function RoomScreen() {
     return entry ? entry[0] : null;
   }, [tacticVotes, user?.uid]);
   const displayMyVote = optimisticVote || myVote;
+
+  useEffect(() => {
+    setPendingTacticId(room?.activeTacticId || null);
+  }, [room?.activeTacticId]);
+
+  useEffect(() => {
+    if (isIGL && filteredTactics.length && !pendingTacticId) {
+      setPendingTacticId(filteredTactics[0].id);
+    }
+  }, [isIGL, filteredTactics, pendingTacticId]);
+
+  useEffect(() => {
+    setPendingTacticId(null);
+  }, [room?.mapId, tacticSide]);
+
+  useEffect(() => {
+    if (myVote && optimisticVote === myVote) {
+      setOptimisticVote(null);
+    }
+  }, [myVote, optimisticVote]);
+
+  useEffect(() => {
+    if (!myVote) {
+      setOptimisticVote(null);
+    }
+  }, [myVote]);
 
   const assignmentsByPlayer = useMemo(() => {
     if (!room) return [];
@@ -262,7 +313,7 @@ export default function RoomScreen() {
     };
 
     updateTimer();
-    const interval = setInterval(updateTimer, 500);
+    const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [room?.timerEnd, room?.phase, room?.timerPaused, room?.pausedRemainingMs]);
 

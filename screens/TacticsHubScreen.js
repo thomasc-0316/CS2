@@ -7,6 +7,9 @@ import { fetchPublicTactics, fetchUserTactics } from '../services/tacticService'
 import { useTacticLibrary } from '../context/TacticLibraryContext';
 import { useAuth } from '../context/AuthContext';
 import TacticCard from '../components/TacticCard';
+import { useRenderCount } from '../hooks/useRenderCount';
+import { useScreenPerf } from '../hooks/useScreenPerf';
+import { fetchDeduped, readMemoryCache, writeMemoryCache } from '../services/dataCache';
 
 export default function TacticsHubScreen({ navigation, route }) {
   const [activeTab, setActiveTab] = useState('explore'); // explore | my
@@ -25,6 +28,15 @@ export default function TacticsHubScreen({ navigation, route }) {
   const [actionMessage, setActionMessage] = useState('');
   const { savedTactics, toggleTactic, isSaved } = useTacticLibrary();
   const { currentUser } = useAuth();
+  const tacticsDataReady = !loadingLineups && !loadingTactics;
+  useRenderCount('TacticsHubScreen');
+
+  useScreenPerf({
+    screenName: 'TacticsHubScreen',
+    transitionName: 'home_to_tactics_hub',
+    hasFirstContent: true,
+    isDataReady: tacticsDataReady,
+  });
 
   useEffect(() => {
     if (route?.params?.startTab && (route.params.startTab === 'explore' || route.params.startTab === 'my')) {
@@ -51,11 +63,22 @@ export default function TacticsHubScreen({ navigation, route }) {
     if (!selectedMapId) return undefined;
     let cancelled = false;
     const fetchLineups = async () => {
+      const cacheKey = `tactics-hub:lineups:${selectedMapId}:${selectedSide}`;
+      const cached = readMemoryCache(cacheKey);
+      if (cached.exists) {
+        setMapLineups(cached.value);
+        setLoadingLineups(false);
+        if (!cached.isExpired) {
+          return;
+        }
+      }
+
       try {
-        setLoadingLineups(true);
-        const lineups = await getFilteredLineups(selectedMapId, { side: selectedSide });
+        setLoadingLineups(!cached.exists);
+        const lineups = await fetchDeduped(cacheKey, () => getFilteredLineups(selectedMapId, { side: selectedSide }));
         if (!cancelled) {
           setMapLineups(lineups || []);
+          writeMemoryCache(cacheKey, lineups || [], 60 * 1000);
         }
       } catch (error) {
         console.error('Failed to load lineups for tactics', error);
@@ -79,16 +102,34 @@ export default function TacticsHubScreen({ navigation, route }) {
       return;
     }
 
+    const cacheKey = `tactics-hub:tactics:${selectedMapId}:${selectedSide}:${currentUser?.uid || 'anon'}`;
+    const cached = readMemoryCache(cacheKey);
+    if (cached.exists) {
+      setPublicTactics(cached.value.publicList || []);
+      setMyTacticsRemote(cached.value.personalList || []);
+      setLoadingTactics(false);
+      if (!cached.isExpired) {
+        return;
+      }
+    }
+
     try {
-      setLoadingTactics(true);
-      const [publicList, personalList] = await Promise.all([
-        fetchPublicTactics(selectedMapId, selectedSide),
-        currentUser?.uid
-          ? fetchUserTactics(currentUser.uid, selectedMapId, selectedSide)
-          : Promise.resolve([]),
-      ]);
+      setLoadingTactics(!cached.exists);
+      const { publicList, personalList } = await fetchDeduped(cacheKey, async () => {
+        const [fetchedPublic, fetchedPersonal] = await Promise.all([
+          fetchPublicTactics(selectedMapId, selectedSide),
+          currentUser?.uid
+            ? fetchUserTactics(currentUser.uid, selectedMapId, selectedSide)
+            : Promise.resolve([]),
+        ]);
+        return {
+          publicList: fetchedPublic || [],
+          personalList: fetchedPersonal || [],
+        };
+      });
       setPublicTactics(publicList || []);
       setMyTacticsRemote(personalList || []);
+      writeMemoryCache(cacheKey, { publicList, personalList }, 45 * 1000);
     } catch (error) {
       console.error('Failed to load tactics', error);
     } finally {
@@ -179,11 +220,11 @@ export default function TacticsHubScreen({ navigation, route }) {
     return Array.from(merged.values());
   }, [hydrateTactic, myTacticsRemote, savedTactics, selectedMapId, selectedSide]);
 
-  const handleLineupPress = (lineup) => {
+  const handleLineupPress = useCallback((lineup) => {
     navigation.navigate('LineupDetail', { lineupId: lineup.id });
-  };
+  }, [navigation]);
 
-  const handleSaveToggle = (tactic) => {
+  const handleSaveToggle = useCallback((tactic) => {
     const payload = {
       ...tactic,
       mapId: tactic.mapId || selectedMapId,
@@ -193,9 +234,9 @@ export default function TacticsHubScreen({ navigation, route }) {
     const wasSaved = isSaved(payload.id);
     toggleTactic(payload);
     setActionMessage(wasSaved ? 'Removed from My Tactics' : 'Saved to My Tactics');
-  };
+  }, [isSaved, selectedMapId, selectedSide, toggleTactic]);
 
-  const handleCreateFromFavorites = () => {
+  const handleCreateFromFavorites = useCallback(() => {
     if (!selectedMapId) {
       setActionMessage('Pick a map first.');
       return;
@@ -209,24 +250,29 @@ export default function TacticsHubScreen({ navigation, route }) {
       side: selectedSide,
       map: selectedMap,
     });
-  };
+  }, [currentUser?.uid, navigation, selectedMap, selectedMapId, selectedSide]);
 
-  const renderTacticCard = ({ item }) => (
-    <TacticCard
-      tactic={item}
-      map={selectedMap}
-      saved={isSaved(item.id)}
-      onSave={() => handleSaveToggle(item)}
-      onLineupPress={handleLineupPress}
-      onPress={() =>
-        navigation.navigate('TacticDetail', {
-          tactic: item,
-          lineups: item.lineups,
-          map: selectedMap,
-        })
-      }
-    />
-  );
+  const renderTacticCard = useCallback(({ item }) => {
+    const handlePress = () =>
+      navigation.navigate('TacticDetail', {
+        tactic: item,
+        lineups: item.lineups,
+        map: selectedMap,
+      });
+
+    const handleSave = () => handleSaveToggle(item);
+
+    return (
+      <TacticCard
+        tactic={item}
+        map={selectedMap}
+        saved={isSaved(item.id)}
+        onSave={handleSave}
+        onLineupPress={handleLineupPress}
+        onPress={handlePress}
+      />
+    );
+  }, [handleLineupPress, handleSaveToggle, isSaved, navigation, selectedMap]);
 
   const renderExplore = () => (
     <View style={{ flex: 1 }}>
